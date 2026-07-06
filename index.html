@@ -177,6 +177,17 @@
     box-shadow: 0 8px 26px rgba(168, 85, 247, .35);
   }
   .memo-btn:hover { box-shadow: 0 12px 32px rgba(168, 85, 247, .5); }
+  .flush-btn {
+    margin-top: 10px;
+    background: linear-gradient(135deg, #0891b2, #22d3ee);
+    box-shadow: 0 8px 26px rgba(34, 211, 238, .3);
+  }
+  .flush-btn:hover { box-shadow: 0 12px 32px rgba(34, 211, 238, .45); }
+  .pending-chip {
+    font-size: 10px; font-weight: 800; color: #fbbf24;
+    background: rgba(251, 191, 36, .12); border: 1px solid rgba(251, 191, 36, .4);
+    padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap;
+  }
   .memo-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .memo-dest { font-size: 11px; color: var(--text-dim); }
   .memo-foot a { font-size: 12px; font-weight: 700; color: var(--accent3); text-decoration: none; }
@@ -408,8 +419,9 @@
 
       <div class="card memo">
         <h2>✦ クイックメモ → Obsidian</h2>
-        <textarea id="memoText" placeholder="思いついたことをサッとメモ…&#10;保存するとObsidianの今日のメモに追記されます"></textarea>
-        <button id="memoSave" class="submit memo-btn">📝 Obsidianに保存</button>
+        <textarea id="memoText" placeholder="思いついたことをサッとメモ…&#10;保存は一瞬（アプリ内）。Obsidianへはあとでまとめて送れます"></textarea>
+        <button id="memoSave" class="submit memo-btn">📝 メモを保存</button>
+        <button id="memoFlush" class="submit memo-btn flush-btn" hidden>📤 Obsidianへまとめて送る</button>
         <div class="memo-foot">
           <span class="memo-dest" id="memoDest"></span>
           <a href="#" id="memoOpen">📓 今日のメモを開く</a>
@@ -698,19 +710,25 @@
   const todayMemoFile = () => memoFileFor(toDateStr(new Date()));
   $('memoDest').textContent = `保存先: ${todayMemoFile()}.md`;
 
-  function buildMemoUri(text) {
-    const d = new Date();
-    const stamp = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    // 複数行はMarkdownの箇条書き継続としてインデント
-    const body = `\n- **${stamp}** ${text.replace(/\n/g, '\n  ')}`;
+  function memoUriFor(content) {
     return 'obsidian://new?vault=' + encodeURIComponent(VAULT)
       + '&file=' + encodeURIComponent(todayMemoFile())
-      + '&content=' + encodeURIComponent(body)
+      + '&content=' + encodeURIComponent(content)
       + '&append=true';
   }
 
-  const loadMemos = () => { try { return JSON.parse(localStorage.getItem(MKEY)) || []; } catch { return []; } };
-  const saveMemos = m => localStorage.setItem(MKEY, JSON.stringify(m.slice(0, 20)));
+  // 旧データ（sentフラグなし＝送信済みとして扱う）も読めるようにする
+  const loadMemos = () => {
+    try { return (JSON.parse(localStorage.getItem(MKEY)) || []).map(x => ({ sent: true, ...x })); }
+    catch { return []; }
+  };
+  // 未送信は絶対に消さない。送信済みだけ直近30件に間引く
+  const saveMemos = list => {
+    const unsent = list.filter(x => !x.sent);
+    const sent = list.filter(x => x.sent).slice(0, 30);
+    const merged = [...unsent, ...sent].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    localStorage.setItem(MKEY, JSON.stringify(merged));
+  };
 
   function renderMemos() {
     const list = loadMemos();
@@ -729,11 +747,21 @@
         <button class="del" title="履歴から削除">✕</button>`;
       div.querySelector('.h-title').textContent = it.text;
       div.querySelector('.h-when').textContent = it.when;
+      if (!it.sent) {
+        const chip = document.createElement('span');
+        chip.className = 'pending-chip';
+        chip.textContent = '未送信';
+        div.querySelector('.h-when').appendChild(chip);
+      }
       div.querySelector('.del').addEventListener('click', () => {
         const arr = loadMemos(); arr.splice(i, 1); saveMemos(arr); renderMemos();
       });
       el.appendChild(div);
     });
+    // 未送信があるときだけ「まとめて送る」ボタンを出す
+    const pending = list.filter(x => !x.sent).length;
+    $('memoFlush').hidden = !pending;
+    if (pending) $('memoFlush').textContent = `📤 Obsidianへまとめて送る（${pending}件）`;
   }
 
   $('memoSave').addEventListener('click', () => {
@@ -745,12 +773,42 @@
     }
     const d = new Date();
     const m = loadMemos();
-    m.unshift({ text, when: `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: Date.now() });
+    m.unshift({ text, when: `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: Date.now(), sent: false });
     saveMemos(m); renderMemos();
-    location.href = buildMemoUri(text);
     $('memoText').value = '';
-    toast('Obsidianの今日のメモに追記しました');
+    $('memoText').focus();
+    toast('アプリに保存しました（あとでまとめてObsidianへ）');
   });
+
+  // 未送信メモを1回のObsidian呼び出しでまとめて追記する
+  function flushMemos(fire = true) {
+    const list = loadMemos();
+    const pending = list.filter(x => !x.sent).sort((a, b) => (a.ts || 0) - (b.ts || 0)); // 古い順
+    if (!pending.length) return null;
+    const todayStr = toDateStr(new Date());
+    const lines = [];
+    let used = 0, count = 0;
+    for (const p of pending) {
+      const d = new Date(p.ts);
+      const stamp = toDateStr(d) === todayStr
+        ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
+        : `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const line = `\n- **${stamp}** ${p.text.replace(/\n/g, '\n  ')}`;
+      if (used + line.length > 4000 && count > 0) break; // URLが長すぎる時は分割（残りは次回）
+      lines.push(line); used += line.length; count++;
+    }
+    const uri = memoUriFor(lines.join(''));
+    if (fire) {
+      const sentSet = new Set(pending.slice(0, count).map(p => p.ts));
+      saveMemos(list.map(x => sentSet.has(x.ts) ? { ...x, sent: true } : x));
+      renderMemos();
+      location.href = uri;
+      const remain = pending.length - count;
+      toast(remain > 0 ? `${count}件送りました。残り${remain}件はもう一度押してください` : `${count}件をObsidianに送りました`);
+    }
+    return uri;
+  }
+  $('memoFlush').addEventListener('click', () => flushMemos());
 
   $('memoOpen').addEventListener('click', e => {
     e.preventDefault();
@@ -1035,7 +1093,8 @@
 
   // デバッグ・検証用フック
   window.__qc = {
-    buildMemoUri, checkDateRollover,
+    checkDateRollover,
+    _flushUri: () => flushMemos(false),
     _setEvents(evts) { allEvents = evts; lastLoad = Date.now(); renderAgenda(); checkConflict(); },
   };
 
