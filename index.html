@@ -760,6 +760,7 @@
 
   /* ---------- Googleカレンダー連携（読み取り専用） ---------- */
   const CIDKEY = 'quickcal_client_id', SEENKEY = 'quickcal_seen', GRANTED = 'quickcal_granted';
+  const TOKKEY = 'quickcal_token', EVCACHE = 'quickcal_ev_cache', CALCACHE = 'quickcal_cal_cache';
   const isHttp = location.protocol.startsWith('http');
   let accessToken = null, tokenClient = null, allEvents = [], lastLoad = 0;
 
@@ -812,6 +813,19 @@
     body.appendChild(b);
   }
 
+  // キャッシュ表示を消さずに再接続だけ促すバー
+  function showReconnectBar() {
+    if ($('reconnBar')) return;
+    const b = document.createElement('button');
+    b.id = 'reconnBar';
+    b.className = 'connect-btn';
+    b.style.cssText = 'width:100%;margin-bottom:10px;padding:10px';
+    b.textContent = '📡 再接続して最新の予定に更新';
+    b.addEventListener('click', () => { b.remove(); connect(); });
+    $('agendaBody').prepend(b);
+  }
+  const onAuthLost = () => { if (allEvents.length) showReconnectBar(); else renderAgendaShell(); };
+
   function connect() {
     if (!(window.google && google.accounts && google.accounts.oauth2)) {
       toast('Googleの部品を読み込み中です。数秒後にもう一度押してください');
@@ -825,10 +839,13 @@
           if (resp.access_token) {
             accessToken = resp.access_token;
             localStorage.setItem(GRANTED, '1');
+            // 有効期限内はトークンを再利用してポップアップを省略（この端末内のみ保存）
+            const exp = Date.now() + Math.max(60, (resp.expires_in || 3600) - 60) * 1000;
+            localStorage.setItem(TOKKEY, JSON.stringify({ t: resp.access_token, exp }));
             loadEvents();
           }
         },
-        error_callback: () => renderAgendaShell(),
+        error_callback: () => onAuthLost(),
       });
     }
     tokenClient.requestAccessToken({ prompt: localStorage.getItem(GRANTED) ? '' : 'consent' });
@@ -836,42 +853,66 @@
 
   async function api(url) {
     const r = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
-    if (r.status === 401 || r.status === 403) { accessToken = null; renderAgendaShell(); throw new Error('auth'); }
+    if (r.status === 401 || r.status === 403) { accessToken = null; localStorage.removeItem(TOKKEY); onAuthLost(); throw new Error('auth'); }
     if (!r.ok) throw new Error('api ' + r.status);
     return r.json();
   }
 
-  async function loadEvents() {
+  async function loadEvents(force) {
     try {
-      $('agendaBody').innerHTML = '<p class="agenda-note">予定を読み込み中…</p>';
+      // 既に何か表示していれば、それを残したまま裏で更新する
+      if (!allEvents.length) $('agendaBody').innerHTML = '<p class="agenda-note">予定を読み込み中…</p>';
       const t0 = new Date(); t0.setHours(0, 0, 0, 0);
       const t1 = new Date(t0); t1.setDate(t1.getDate() + 7);
-      const cl = await api('https://www.googleapis.com/calendar/v3/users/me/calendarList');
-      const cals = (cl.items || []).filter(c => c.selected !== false);
+      // カレンダー一覧は変わらないので24時間キャッシュ（往復1回ぶん短縮）
+      let cals = null;
+      if (!force) {
+        try {
+          const cc = JSON.parse(localStorage.getItem(CALCACHE));
+          if (cc && Date.now() - cc.ts < 86400000) cals = cc.cals;
+        } catch {}
+      }
+      if (!cals) {
+        const cl = await api('https://www.googleapis.com/calendar/v3/users/me/calendarList');
+        cals = (cl.items || []).filter(c => c.selected !== false)
+          .map(c => ({ id: c.id, summary: c.summary, backgroundColor: c.backgroundColor }));
+        localStorage.setItem(CALCACHE, JSON.stringify({ ts: Date.now(), cals }));
+      }
       const lists = await Promise.all(cals.map(c =>
         api('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(c.id)
           + '/events?singleEvents=true&orderBy=startTime&maxResults=50'
           + '&timeMin=' + encodeURIComponent(t0.toISOString())
           + '&timeMax=' + encodeURIComponent(t1.toISOString()))
-          .then(r => (r.items || []).map(ev => ({ ...ev, __cal: c.summary, __color: c.backgroundColor || '#6366f1' })))
+          .then(r => (r.items || []).filter(ev => ev.status !== 'cancelled').map(ev => ({
+            id: ev.id, summary: ev.summary, start: ev.start, end: ev.end, htmlLink: ev.htmlLink,
+            __cal: c.summary, __color: c.backgroundColor || '#6366f1',
+          })))
           .catch(e => { if (e.message === 'auth') throw e; return []; })
       ));
-      allEvents = lists.flat().filter(e => e.status !== 'cancelled');
+      allEvents = lists.flat();
       allEvents.sort((a, b) => evStart(a) - evStart(b));
       lastLoad = Date.now();
+      localStorage.setItem(EVCACHE, JSON.stringify({ ts: lastLoad, events: allEvents }));
       renderAgenda(); checkConflict();
     } catch (e) {
-      if (e.message !== 'auth') {
+      if (e.message !== 'auth' && !allEvents.length) {
         $('agendaBody').innerHTML = '<p class="agenda-note">読み込みに失敗しました。↻ボタンで再試行してください。</p>';
         $('agRefresh').hidden = false;
       }
     }
   }
 
-  function renderAgenda() {
+  function renderAgenda(staleTs) {
     const body = $('agendaBody');
     body.innerHTML = '';
     $('agRefresh').hidden = false;
+    if (staleTs) {
+      const p = document.createElement('p');
+      p.className = 'agenda-note';
+      const d = new Date(staleTs);
+      p.textContent = `📥 前回取得: ${d.getMonth()+1}/${d.getDate()} ${fmtT(d)}`;
+      body.appendChild(p);
+    }
     const seen = loadSeen();
     const today0 = new Date(); today0.setHours(0, 0, 0, 0);
     const dayOf = e => {
@@ -952,14 +993,33 @@
       `「${ev.summary || '(無題)'}」${fmtT(evStart(ev))}〜${fmtT(evEnd(ev))}`).join('、');
   }
 
-  $('agRefresh').addEventListener('click', () => { if (accessToken) loadEvents(); else renderAgendaShell(); });
+  $('agRefresh').addEventListener('click', () => { if (accessToken) loadEvents(true); else renderAgendaShell(); });
   // 画面に戻ってきたら自動で最新化（Googleカレンダーで保存して戻る流れを想定）
   window.addEventListener('focus', () => { if (accessToken && Date.now() - lastLoad > 30000) loadEvents(); });
   setInterval(() => { if (accessToken && Date.now() - lastLoad > 240000) loadEvents(); }, 60000);
-  // 前回接続済みなら読み込み後に自動で再接続を試す（ブロックされたらボタン表示のまま）
+  // 起動を速く見せる3段構え:
+  // ①前回の予定キャッシュを即表示 → ②トークンが生きていればポップアップなしで裏更新
+  // → ③トークン切れなら自動再接続を試す（ブロックされたら接続ボタンのまま）
   window.addEventListener('load', () => {
-    if (isHttp && getCID() && localStorage.getItem(GRANTED)) setTimeout(connect, 400);
+    if (!isHttp) return;
+    try {
+      const ec = JSON.parse(localStorage.getItem(EVCACHE));
+      if (ec && Array.isArray(ec.events) && ec.events.length) {
+        allEvents = ec.events;
+        renderAgenda(ec.ts); checkConflict();
+      }
+    } catch {}
+    try {
+      const tk = JSON.parse(localStorage.getItem(TOKKEY));
+      if (tk && tk.exp > Date.now()) { accessToken = tk.t; loadEvents(); return; }
+    } catch {}
+    if (getCID() && localStorage.getItem(GRANTED)) setTimeout(connect, 400);
   });
+
+  // Service Worker登録（2回目以降の起動はネット待ちゼロで表示）
+  if ('serviceWorker' in navigator && isHttp) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
 
   /* ---------- 日付またぎ自動更新 ---------- */
   // 開きっぱなしで0時をまたいでも、日付欄（昨日の「今日」のままの場合のみ）と
