@@ -1,6 +1,6 @@
 // QuickCal Service Worker — アプリ本体をキャッシュして瞬間起動にする
 // 方式: stale-while-revalidate（キャッシュを即返し、裏で最新を取得して次回に反映）
-const CACHE = 'quickcal-v2';
+const CACHE = 'quickcal-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
