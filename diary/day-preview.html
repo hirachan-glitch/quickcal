@@ -1,0 +1,172 @@
+<title>毎日日記 — ページ見本</title>
+<style>
+  :root{
+    --paper:#FAF6EE;         /* 温かい紙 */
+    --paper-edge:#F1EADB;
+    --ink:#26313f;           /* 藍墨の本文 */
+    --indigo:#31486e;        /* 藍のアクセント */
+    --indigo-soft:rgba(49,72,110,.16);
+    --dot:rgba(49,72,110,.20);
+    --seal:#C24A3A;          /* 朱の日付印 */
+    --muted:#7a7261;         /* 温かいグレー */
+    --backdrop:#E6E0D4;
+    --serif:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+    --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){ :root{ --backdrop:#191b1f; } }
+  :root[data-theme="dark"]{ --backdrop:#191b1f; }
+  :root[data-theme="light"]{ --backdrop:#E6E0D4; }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--backdrop);
+    font-family:var(--sans); color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:28px 16px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- 画面用ツールバー（印刷では消える）---- */
+  .bar{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    margin-bottom:22px; color:var(--muted); font-size:13px;
+  }
+  .bar b{color:var(--ink); font-weight:600}
+  .btn{
+    font-family:var(--sans); font-size:13px; cursor:pointer;
+    border:1px solid var(--indigo); color:var(--indigo); background:transparent;
+    padding:7px 14px; border-radius:999px; letter-spacing:.03em;
+  }
+  .btn:hover{background:var(--indigo); color:#fff}
+  .btn:focus-visible{outline:2px solid var(--seal); outline-offset:2px}
+
+  /* ---- A5 の紙 ---- */
+  .sheet{
+    width:148mm; height:210mm; background:var(--paper);
+    background-image:linear-gradient(135deg,var(--paper) 0%,var(--paper-edge) 100%);
+    box-shadow:0 10px 30px rgba(40,35,25,.22), 0 2px 6px rgba(40,35,25,.14);
+    padding:14mm 13mm 11mm; position:relative;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---- 見出し ---- */
+  .head{display:flex; justify-content:space-between; align-items:flex-start}
+  .title{
+    font-family:var(--serif); font-size:25px; font-weight:600;
+    letter-spacing:.14em; color:var(--ink); margin:0;
+  }
+  .subtitle{
+    font-size:10.5px; letter-spacing:.18em; color:var(--muted);
+    margin-top:5px;
+  }
+  /* 朱の日付印 */
+  .seal{
+    flex:none; width:52px; height:52px; border:1.6px solid var(--seal);
+    border-radius:5px; color:var(--seal); position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    line-height:1; transform:rotate(-3deg);
+  }
+  .seal .n{font-family:var(--serif); font-size:22px; font-weight:700}
+  .seal .d{font-size:8.5px; letter-spacing:.24em; margin-top:3px}
+
+  /* ---- 日付の行 ---- */
+  .date{
+    margin-top:16px; display:flex; align-items:baseline; gap:6px;
+    font-size:14px; color:var(--ink); letter-spacing:.04em;
+  }
+  .date .u{
+    display:inline-block; border-bottom:1px solid var(--indigo-soft);
+    min-width:44px; text-align:center; padding-bottom:2px;
+  }
+  .date .u.sm{min-width:30px}
+  .date .lbl{color:var(--muted); font-size:13px}
+
+  /* ---- 記入欄（極薄ドット）---- */
+  .field{
+    flex:1 1 auto; margin-top:14px; border-radius:2px;
+    background-image:radial-gradient(var(--dot) 1.1px, transparent 1.2px);
+    background-size:6.2mm 6.2mm; background-position:2mm 3mm;
+    position:relative;
+  }
+  .field .hint{
+    position:absolute; top:10px; left:12px; font-size:11px;
+    color:var(--muted); letter-spacing:.06em;
+  }
+
+  /* ---- AIへのフッター ---- */
+  .ai{
+    margin-top:12px; border:1px solid var(--indigo-soft);
+    border-radius:6px; overflow:hidden;
+  }
+  .ai-h{
+    background:var(--indigo); color:#fdfbf6;
+    font-size:11px; letter-spacing:.1em; padding:5px 12px;
+    display:flex; align-items:center; gap:7px;
+  }
+  .ai-b{padding:9px 13px 11px; font-size:10.7px; line-height:1.62; color:#3a4453}
+  .ai-b .lead{color:var(--ink)}
+  .items{
+    display:grid; grid-template-columns:1fr 1fr; gap:2px 18px;
+    margin:6px 0 5px; padding:0; list-style:none;
+  }
+  .items li{position:relative; padding-left:14px}
+  .items li::before{
+    content:"◆"; position:absolute; left:0; top:.05em;
+    color:var(--seal); font-size:8px;
+  }
+  .items b{color:var(--ink); font-weight:600}
+  .items span{color:#6b7484}
+  .ai-b .foot{color:var(--muted); font-style:normal}
+
+  @media print{
+    @page{ size:A5; margin:0 }
+    body{background:#fff; padding:0}
+    .bar{display:none}
+    .sheet{box-shadow:none; width:148mm; height:210mm}
+  }
+</style>
+
+<div class="bar no-print">
+  <b>毎日日記</b>ページ見本（A5）
+  <span>— 実寸イメージです。</span>
+  <button class="btn" onclick="window.print()">印刷 / PDFで保存</button>
+</div>
+
+<div class="sheet">
+  <div class="head">
+    <div>
+      <h1 class="title">きょうの日記</h1>
+      <div class="subtitle">FREE DIARY &nbsp;·&nbsp; おもうまま、すきなだけ</div>
+    </div>
+    <div class="seal" aria-label="1日目">
+      <span class="n">1</span><span class="d">DAY</span>
+    </div>
+  </div>
+
+  <div class="date">
+    <span class="u">　　</span><span class="lbl">年</span>
+    <span class="u sm">　</span><span class="lbl">月</span>
+    <span class="u sm">　</span><span class="lbl">日</span>
+    <span class="lbl">（　　）</span>
+    <span class="lbl" style="margin-left:auto">きょうの天気　　　　</span>
+  </div>
+
+  <div class="field">
+    <span class="hint">──　なんでも、おもったことを　──</span>
+  </div>
+
+  <div class="ai">
+    <div class="ai-h">📷　このページを撮って、AIに送ってください</div>
+    <div class="ai-b">
+      <span class="lead">AIへ：自由に書いた日記です。誤字も、文章のうまさも直さないで。良い悪いの点もつけないで。</span>
+      そのかわり、書かれたことをよく読んで、こう返してください。
+      <ul class="items">
+        <li><b>きょうの要点</b> <span>どんな一日だったかを短く</span></li>
+        <li><b>心の動き</b> <span>気づいた気持ちを、そっと</span></li>
+        <li><b>残したい一言</b> <span>この人が書いた言葉から</span></li>
+        <li><b>あしたへのひとこと</b> <span>そっと一言だけ</span></li>
+      </ul>
+      <span class="foot">となりに座っている人のつもりで、静かに。直すのではなく、いっしょに見てください。</span>
+    </div>
+  </div>
+</div>
