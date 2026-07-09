@@ -22,9 +22,11 @@
     margin:0; background:var(--backdrop);
     font-family:var(--sans); color:var(--ink);
     display:flex; flex-direction:column; align-items:center;
-    padding:28px 16px 60px;
+    padding:20px 12px 48px; overflow-x:hidden;
     -webkit-font-smoothing:antialiased;
   }
+  /* スマホでもはみ出さないよう、A5の紙を画面幅に合わせて縮小 */
+  .stage{position:relative; margin:0 auto}
 
   /* ---- 画面用ツールバー（印刷では消える）---- */
   .bar{
@@ -45,7 +47,8 @@
     width:148mm; height:210mm; background:var(--paper);
     background-image:linear-gradient(135deg,var(--paper) 0%,var(--paper-edge) 100%);
     box-shadow:0 10px 30px rgba(40,35,25,.22), 0 2px 6px rgba(40,35,25,.14);
-    padding:14mm 13mm 11mm; position:relative;
+    padding:14mm 13mm 11mm; position:absolute; top:0; left:0;
+    transform-origin:top left;
     display:flex; flex-direction:column;
   }
 
@@ -120,9 +123,11 @@
 
   @media print{
     @page{ size:A5; margin:0 }
-    body{background:#fff; padding:0}
+    body{background:#fff; padding:0; overflow:visible}
     .bar{display:none}
-    .sheet{box-shadow:none; width:148mm; height:210mm}
+    .stage{width:auto !important; height:auto !important}
+    .sheet{box-shadow:none; width:148mm; height:210mm;
+      position:static !important; transform:none !important}
   }
 </style>
 
@@ -132,6 +137,7 @@
   <button class="btn" onclick="window.print()">印刷 / PDFで保存</button>
 </div>
 
+<div class="stage">
 <div class="sheet">
   <div class="head">
     <div>
@@ -170,3 +176,24 @@
     </div>
   </div>
 </div>
+</div>
+
+<script>
+  (function(){
+    var sheet=document.querySelector('.sheet');
+    var stage=document.querySelector('.stage');
+    function fit(){
+      sheet.style.transform='none';
+      var w=sheet.offsetWidth, h=sheet.offsetHeight;
+      var avail=Math.min(window.innerWidth-24, w);
+      var s=avail/w; if(s>1) s=1;
+      sheet.style.transform='scale('+s+')';
+      stage.style.width=(w*s)+'px';
+      stage.style.height=(h*s)+'px';
+    }
+    window.addEventListener('resize',fit);
+    if(window.visualViewport) window.visualViewport.addEventListener('resize',fit);
+    window.addEventListener('load',fit);
+    fit();
+  })();
+</script>
