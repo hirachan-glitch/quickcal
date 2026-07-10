@@ -132,6 +132,18 @@
       ev.preventDefault();
     }
 
+    // Programmatically set the knob (used for auto-takeoff / resetting throttle).
+    // Ignored while a finger is actively driving this stick so we never fight the user.
+    stick.setAxis = function (nx, ny) {
+      if (stick.pointerId !== null) return;
+      stick.nx = clamp(nx, -1, 1);
+      stick.ny = clamp(ny, -1, 1);
+      var r = stick.base.getBoundingClientRect().width / 2;
+      stick.knob.style.transform =
+        'translate(-50%, -50%) translate(' + (stick.nx * r) + 'px,' + (-stick.ny * r) + 'px)';
+      if (opts.onMove) opts.onMove(stick.nx, stick.ny);
+    };
+
     stick.base.addEventListener('pointerdown', onPointerDown, { passive: false });
     stick.base.addEventListener('pointermove', onPointerMove, { passive: false });
     stick.base.addEventListener('pointerup', onPointerUp, { passive: false });
@@ -399,10 +411,22 @@
     }
   }
 
+  /* ------------------------------------------------------------------ *
+   * setThrottle(v) — move the left throttle stick to 0..1 programmatically.
+   * Used by main.js for auto-takeoff on ARM/START and to drop it on RESET.
+   * Leaves the yaw (horizontal) axis untouched.
+   * ------------------------------------------------------------------ */
+  function setThrottle(v) {
+    v = clamp(v, 0, 1);
+    axes.throttle = v;
+    if (leftStick) leftStick.setAxis(leftStick.nx, v * 2 - 1);
+  }
+
   window.DRONE.Controls = {
     init: init,
     read: read,
     on: on,
-    setArmed: setArmed
+    setArmed: setArmed,
+    setThrottle: setThrottle
   };
 })();

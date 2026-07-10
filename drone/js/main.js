@@ -14,6 +14,10 @@
 
   var CAM_MODES = ['chase', 'orbit', 'fpv'];
   var CAM_LABEL = { chase: '追尾', orbit: '俯瞰', fpv: 'FPV' };
+  // Throttle the sim auto-sets on ARM/START so the drone actually lifts off into a
+  // gentle climb instead of sitting on the ground at zero throttle. Hover is ~0.45,
+  // so this is just above it — the player then modulates with the left stick.
+  var TAKEOFF_THROTTLE = 0.52;
 
   var state = null;
   var world = null;
@@ -90,6 +94,7 @@
     state.battery = 100;          // integration choice: reset = fresh pack
     resetCourse();
     DRONE.Controls.setArmed(false);
+    if (DRONE.Controls.setThrottle) DRONE.Controls.setThrottle(0); // knob back to bottom
     shownArmed = false;
     gateFlashUntil = 0;
   }
@@ -308,6 +313,13 @@
     state.armed = !!on;
     shownArmed = state.armed;
     DRONE.Controls.setArmed(state.armed);
+    // Auto-takeoff: when arming from the ground with throttle near zero, nudge the
+    // throttle stick up so the drone lifts off instead of sitting there. If the
+    // player already has the throttle raised, leave their input alone.
+    if (state.armed && DRONE.Controls.setThrottle) {
+      var input = DRONE.Controls.read();
+      if (input.throttle < TAKEOFF_THROTTLE) DRONE.Controls.setThrottle(TAKEOFF_THROTTLE);
+    }
   }
 
   function boot() {
