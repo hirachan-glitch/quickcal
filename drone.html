@@ -1,0 +1,2373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ドローン">
+<meta name="theme-color" content="#0a0e14">
+<title>ドローンシミュレーター</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0e14;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", Roboto, sans-serif;
+  }
+  body { position: fixed; inset: 0; }
+
+  canvas#scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 1;
+  }
+  #controls {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+  }
+
+  /* ---------- portrait: "rotate your phone" overlay ---------- */
+  #rotate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: #0a0e14;
+    color: #cfe6ff;
+    text-align: center;
+    padding: 24px;
+  }
+  #rotate-overlay .phone-icon {
+    width: 46px;
+    height: 78px;
+    border: 3px solid #cfe6ff;
+    border-radius: 9px;
+    position: relative;
+    animation: rotate-hint 2s ease-in-out infinite;
+  }
+  #rotate-overlay .phone-icon::after {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 3px;
+    border-radius: 2px;
+    background: #cfe6ff;
+  }
+  @keyframes rotate-hint {
+    0%, 25%   { transform: rotate(0deg); }
+    55%, 100% { transform: rotate(90deg); }
+  }
+  #rotate-overlay h1 { font-size: 20px; font-weight: 700; }
+  #rotate-overlay p  { font-size: 13px; color: rgba(190, 220, 255, 0.6); }
+  @media (orientation: portrait) {
+    #rotate-overlay { display: flex; }
+  }
+
+  /* ---------- start overlay (how to play, Mode-2 legend) ---------- */
+  #start-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(6, 10, 16, 0.88);
+    color: #eaf4ff;
+    text-align: center;
+    padding: 16px calc(16px + env(safe-area-inset-right, 0px)) 16px calc(16px + env(safe-area-inset-left, 0px));
+  }
+  #start-overlay h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  #start-overlay .legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #start-overlay .legend div {
+    background: rgba(20, 30, 44, 0.85);
+    border: 1px solid rgba(140, 200, 255, 0.3);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    text-align: left;
+    min-width: 200px;
+  }
+  #start-overlay .legend b {
+    color: #7ddcff;
+    display: block;
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+  #start-overlay .goal {
+    font-size: 12.5px;
+    color: rgba(190, 220, 255, 0.75);
+  }
+  #start-btn {
+    appearance: none;
+    border: 2px solid rgba(160, 255, 200, 0.8);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(60, 220, 120, 0.95), rgba(20, 130, 70, 0.95));
+    color: #04180a;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 12px 42px;
+    margin-top: 4px;
+    box-shadow: 0 4px 18px rgba(40, 200, 110, 0.4);
+    cursor: pointer;
+  }
+  #start-btn:active { transform: scale(0.96); }
+</style>
+</head>
+<body>
+
+  <canvas id="scene"></canvas>
+  <div id="controls"></div>
+
+  <!-- start overlay: brief JP how-to (Mode-2), START arms the drone -->
+  <div id="start-overlay">
+    <h1>ドローンシミュレーター</h1>
+    <div class="legend">
+      <div>
+        <b>左スティック（Mode 2）</b>
+        上下：上昇・下降（スロットル・保持式）<br>
+        左右：旋回（ヨー）
+      </div>
+      <div>
+        <b>右スティック</b>
+        上下：前進・後退（ピッチ）<br>
+        左右：左右移動（ロール）
+      </div>
+    </div>
+    <p class="goal">スタートで自動的にふわっと離陸します。左スティックで高度を調整。<br>
+    黄色いゲートを順番にくぐってコースを周回しよう。<br>
+    墜落したら <b>RESET</b>、モード切替は <b>ANGLE/ACRO</b>、視点は <b>CAM</b>。</p>
+    <button id="start-btn" type="button">スタート / START</button>
+  </div>
+
+  <!-- portrait warning: shown only in portrait orientation -->
+  <div id="rotate-overlay">
+    <div class="phone-icon"></div>
+    <h1>横画面にしてください</h1>
+    <p>このシミュレーターは横向き専用です。スマホを横に回転してください。</p>
+  </div>
+
+  <script>
+/* ===== physics.js ===== */
+/* ==========================================================================
+ * DRONE.Physics — rigid-body quadcopter flight dynamics
+ * --------------------------------------------------------------------------
+ * Classic script, no modules. Attaches to window.DRONE.Physics.
+ *
+ * Coordinate system (shared contract): right-handed, y = UP (m),
+ * x = right, z = forward (north). Ground plane at y = 0.
+ * euler.yaw about +y, euler.pitch about +x (nose up = +),
+ * euler.roll about +z (right wing down = +). All angles radians.
+ *
+ * Public API:
+ *   DRONE.Physics.create()                       -> state
+ *   DRONE.Physics.step(state, input, dt, wind)   // wind optional {x,y,z} m/s
+ *                                                //  (extends the contract's
+ *                                                //   4-arg signature; main.js
+ *                                                //   passes world.wind)
+ *   DRONE.Physics.reset(state)                   // back to spawn, keeps mode+battery
+ *   DRONE.Physics.setMode(state, 'angle'|'acro')
+ * ========================================================================== */
+(function () {
+  'use strict';
+  window.DRONE = window.DRONE || {};
+
+  /* ---------------------------- Tuning constants ------------------------- */
+  var MASS        = 0.9;               // kg
+  var G           = 9.81;              // m/s^2
+  var TWR         = 2.2;               // thrust-to-weight ratio
+  var MAX_THRUST  = TWR * MASS * G;    // ~19.4 N  => hover throttle ~ 1/TWR ~ 0.45
+
+  // Quadratic aero drag: F = -k * |v| * v  (per axis, world frame).
+  // Horizontal drag a bit higher than vertical (frame + props present more
+  // area sideways). Tuned so top speed ~ 18-20 m/s at full-tilt full-throttle
+  // and the craft coasts noticeably when the stick is released.
+  var DRAG_H      = 0.045;             // kg/m horizontal (x,z)
+  var DRAG_V      = 0.030;             // kg/m vertical   (y)
+
+  // ANGLE mode: sticks command target tilt, attitude follows through a
+  // critically-damped 2nd-order system:  a'' = w^2*(target-a) - 2*w*a'
+  var MAX_TILT    = 35 * Math.PI / 180;   // max commanded tilt (rad)
+  var ATT_TAU     = 0.12;                 // attitude time constant (s)
+  var ATT_W       = 1 / ATT_TAU;          // natural frequency (rad/s)
+
+  // Yaw in angle mode: stick commands a yaw RATE with first-order spin-up lag.
+  var MAX_YAW_RATE  = 180 * Math.PI / 180; // rad/s
+  var YAW_LAG_TAU   = 0.10;                // s
+
+  // ACRO mode: sticks command body rates directly, with a short lag so the
+  // craft still has rotational "weight". No self-levelling.
+  var ACRO_MAX_RATE = 360 * Math.PI / 180; // rad/s all axes
+  var ACRO_LAG_TAU  = 0.07;                // s
+
+  // Motor spool: commanded throttle -> actual thrust fraction (1st order lag).
+  var MOTOR_TAU   = 0.09;              // s
+
+  // Ground interaction
+  var CRASH_VSPEED  = -4.0;            // m/s: landing harder than this = crash
+  var CRASH_TILT    = 60 * Math.PI / 180; // touching down more tilted = crash
+  var GROUND_FRICTION = 6.0;           // 1/s horizontal decel factor on ground
+
+  // Battery: ~7 min (420 s) hovering at ~0.45 throttle to empty.
+  //   drain %/s = throttle * BATT_RATE ; 100 / (0.45 * 420) ~= 0.53
+  var BATT_RATE   = 0.53;              // %/s per unit throttle
+  var BATT_WEAK_BELOW = 10;            // motors start weakening below this %
+
+  var MAX_SUBSTEP = 1 / 120;           // physics sub-step cap (s)
+  var TWO_PI      = Math.PI * 2;
+
+  /* ------------------------------ Helpers -------------------------------- */
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function wrapPi(a) {
+    // wrap angle to (-PI, PI]
+    a = a % TWO_PI;
+    if (a > Math.PI) a -= TWO_PI;
+    else if (a <= -Math.PI) a += TWO_PI;
+    return a;
+  }
+
+  // Body -> world rotation applied to the body-UP axis (0,1,0).
+  // Rotation order: yaw (about +y), then pitch (about +x), then roll (about +z),
+  // i.e. R = Ry(yaw) * Rx(-pitch') ... expressed directly below.
+  // With pitch = nose-up positive and z = forward:
+  //   nose-up (pitch+) tips the thrust vector BACKWARD (-z accel)  -> brakes
+  //   nose-down (pitch-) tips it FORWARD (+z accel)
+  //   roll+ (right down) tips it RIGHT (+x accel)
+  function bodyUpWorld(e, out) {
+    // R = Ry(yaw) * Rx(-pitch) * Rz(-roll)  (sign flips give the contract's
+    // "nose-up = +pitch", "right-down = +roll" conventions in a RH frame).
+    // Column for body-up (0,1,0) before yaw:
+    //   roll  right-down (+): up leans RIGHT  -> ( sin r, cos r, 0 )
+    //   pitch nose-up   (+): up leans BACK    -> multiply y,z by Rx(-p)
+    //   => up_local = ( sr, cp*cr, -sp*cr )
+    var cy = Math.cos(e.yaw),   sy = Math.sin(e.yaw);
+    var cp = Math.cos(e.pitch), sp = Math.sin(e.pitch);
+    var cr = Math.cos(e.roll),  sr = Math.sin(e.roll);
+    var ux = sr;
+    var uy = cp * cr;
+    var uz = -sp * cr;
+    // yaw about +y rotates x/z (yaw+ turns nose right):
+    out.x = cy * ux + sy * uz;
+    out.y = uy;
+    out.z = -sy * ux + cy * uz;
+    return out;
+  }
+
+  /* ------------------------------- create -------------------------------- */
+
+  function create() {
+    var state = {
+      pos:    { x: 0, y: 0, z: 0 },
+      vel:    { x: 0, y: 0, z: 0 },
+      euler:  { yaw: 0, pitch: 0, roll: 0 },
+      angVel: { yaw: 0, pitch: 0, roll: 0 },
+      armed: false,
+      mode: 'angle',
+      throttleCmd: 0,
+      battery: 100,
+      // derived
+      altitude: 0,
+      speed: 0,
+      verticalSpeed: 0,
+      tiltDeg: 0,
+      gForce: 1,
+      motors: [0, 0, 0, 0],   // FL, FR, RL, RR
+      crashed: false,
+      // internal (prefixed _, safe for others to ignore)
+      _motorOut: 0,           // spooled thrust fraction 0..1
+      _prevVel: { x: 0, y: 0, z: 0 }
+    };
+    return state;
+  }
+
+  /* -------------------------------- reset -------------------------------- */
+
+  function reset(state) {
+    state.pos.x = 0; state.pos.y = 0; state.pos.z = 0;
+    state.vel.x = 0; state.vel.y = 0; state.vel.z = 0;
+    state.euler.yaw = 0; state.euler.pitch = 0; state.euler.roll = 0;
+    state.angVel.yaw = 0; state.angVel.pitch = 0; state.angVel.roll = 0;
+    state.armed = false;
+    state.throttleCmd = 0;
+    state.crashed = false;
+    state._motorOut = 0;
+    state._prevVel.x = 0; state._prevVel.y = 0; state._prevVel.z = 0;
+    // keep mode and battery
+    state.altitude = 0; state.speed = 0; state.verticalSpeed = 0;
+    state.tiltDeg = 0; state.gForce = 1;
+    state.motors[0] = state.motors[1] = state.motors[2] = state.motors[3] = 0;
+  }
+
+  /* ------------------------------- setMode ------------------------------- */
+
+  function setMode(state, mode) {
+    if (mode === 'angle' || mode === 'acro') state.mode = mode;
+  }
+
+  /* --------------------------------- step -------------------------------- */
+  // step(state, input, dt [, wind]) — wind is an optional {x,y,z} m/s gust
+  // vector (world frame) applied as external aero force on the airframe.
+
+  var _up = { x: 0, y: 1, z: 0 }; // scratch vector, reused (no per-frame alloc)
+
+  function step(state, input, dt, wind) {
+    if (!(dt > 0)) return;
+    if (dt > 0.1) dt = 0.1;                    // tab-switch guard
+    wind = wind || null;
+
+    // Sub-step so the 2nd-order attitude loop stays stable at any frame rate.
+    var n = Math.ceil(dt / MAX_SUBSTEP);
+    var h = dt / n;
+    for (var i = 0; i < n; i++) subStep(state, input, h, wind);
+
+    updateDerived(state, dt);
+  }
+
+  function subStep(state, input, h, wind) {
+    var e = state.euler, w = state.angVel, v = state.vel;
+
+    var thr   = clamp(input.throttle || 0, 0, 1);
+    var inYaw   = clamp(input.yaw   || 0, -1, 1);
+    var inPitch = clamp(input.pitch || 0, -1, 1);
+    var inRoll  = clamp(input.roll  || 0, -1, 1);
+
+    var flying = state.armed && !state.crashed;
+    if (!flying) { thr = 0; inYaw = inPitch = inRoll = 0; }
+    state.throttleCmd = flying ? clamp(input.throttle || 0, 0, 1) : 0;
+
+    /* --- motor spool (1st order lag on thrust) --- */
+    var battFactor = state.battery <= 0 ? 0
+      : state.battery < BATT_WEAK_BELOW ? (0.55 + 0.45 * state.battery / BATT_WEAK_BELOW)
+      : 1;
+    var targetOut = flying ? thr * battFactor : 0;
+    state._motorOut += (targetOut - state._motorOut) * (1 - Math.exp(-h / MOTOR_TAU));
+    var T = state._motorOut * MAX_THRUST;   // Newtons along body-up
+
+    /* --- attitude dynamics --- */
+    if (flying) {
+      if (state.mode === 'angle') {
+        // Sticks command target tilt; critically-damped 2nd-order tracking.
+        // pitch stick forward (+) => nose DOWN => negative pitch target.
+        var tgtPitch = -inPitch * MAX_TILT;
+        var tgtRoll  =  inRoll  * MAX_TILT;
+        var w2 = ATT_W * ATT_W, tw = 2 * ATT_W;
+        var aP = w2 * (tgtPitch - e.pitch) - tw * w.pitch;
+        var aR = w2 * (tgtRoll  - e.roll ) - tw * w.roll;
+        w.pitch += aP * h;
+        w.roll  += aR * h;
+        // yaw: rate command with spin-up lag
+        var tgtYawRate = inYaw * MAX_YAW_RATE;
+        w.yaw += (tgtYawRate - w.yaw) * (1 - Math.exp(-h / YAW_LAG_TAU));
+      } else {
+        // ACRO: direct body-rate command with short lag; no self-level.
+        var k = 1 - Math.exp(-h / ACRO_LAG_TAU);
+        w.pitch += (-inPitch * ACRO_MAX_RATE - w.pitch) * k;
+        w.roll  += ( inRoll  * ACRO_MAX_RATE - w.roll ) * k;
+        w.yaw   += ( inYaw   * ACRO_MAX_RATE - w.yaw  ) * k;
+      }
+    } else {
+      // Unpowered: rotational damping only (no active control).
+      var d = Math.exp(-h * 2.0);
+      w.pitch *= d; w.roll *= d; w.yaw *= d;
+    }
+
+    e.yaw   = wrapPi(e.yaw   + w.yaw   * h);
+    e.pitch = wrapPi(e.pitch + w.pitch * h);
+    e.roll  = wrapPi(e.roll  + w.roll  * h);
+
+    /* --- linear dynamics --- */
+    bodyUpWorld(e, _up);           // thrust direction in world frame
+
+    // Air-relative velocity (wind makes the airframe drift with the gust).
+    var wx = wind ? (wind.x || 0) : 0;
+    var wy = wind ? (wind.y || 0) : 0;
+    var wz = wind ? (wind.z || 0) : 0;
+    var rx = v.x - wx, ry = v.y - wy, rz = v.z - wz;
+    var rmag = Math.sqrt(rx * rx + ry * ry + rz * rz);
+
+    var ax = (T * _up.x - DRAG_H * rmag * rx) / MASS;
+    var ay = (T * _up.y - DRAG_V * rmag * ry) / MASS - G;
+    var az = (T * _up.z - DRAG_H * rmag * rz) / MASS;
+
+    // semi-implicit Euler
+    v.x += ax * h; v.y += ay * h; v.z += az * h;
+    state.pos.x += v.x * h;
+    state.pos.y += v.y * h;
+    state.pos.z += v.z * h;
+
+    /* --- ground contact --- */
+    if (state.pos.y <= 0) {
+      var impactV = v.y;      // velocity at touchdown (negative = descending)
+      state.pos.y = 0;
+
+      var tilt = totalTilt(e);
+      if (state.armed && (impactV < CRASH_VSPEED || tilt > CRASH_TILT)) {
+        // Hard landing or landing on the side/back: crash, motors cut.
+        state.crashed = true;
+        state.armed = false;
+        state._motorOut = 0;
+      }
+
+      if (v.y < 0) v.y = 0;   // no bounce, ground absorbs it
+
+      // Ground friction on horizontal velocity
+      var f = Math.exp(-h * GROUND_FRICTION);
+      v.x *= f; v.z *= f;
+
+      // Sitting on the ground (low thrust): settle level & kill rotation,
+      // unless crashed in acro etc. — keep it simple: level out when slow.
+      if (state._motorOut * MAX_THRUST < MASS * G * 0.9) {
+        var s = Math.exp(-h * 8);
+        e.pitch *= s; e.roll *= s;
+        w.pitch *= s; w.roll *= s;
+        if (!flying) w.yaw *= s;
+      }
+    }
+
+    /* --- battery --- */
+    if (flying && state._motorOut > 0) {
+      state.battery = Math.max(0, state.battery - state._motorOut * BATT_RATE * h);
+    }
+  }
+
+  function totalTilt(e) {
+    // angle between body-up and world-up
+    var cp = Math.cos(e.pitch), cr = Math.cos(e.roll);
+    return Math.acos(clamp(cr * cp, -1, 1));
+  }
+
+  /* --------------------------- derived fields ---------------------------- */
+
+  function updateDerived(state, dt) {
+    var v = state.vel, e = state.euler, w = state.angVel;
+
+    state.altitude = state.pos.y;
+    state.speed = Math.sqrt(v.x * v.x + v.z * v.z);
+    state.verticalSpeed = v.y;
+    state.tiltDeg = totalTilt(e) * 180 / Math.PI;
+
+    // gForce: magnitude of proper acceleration (accel felt minus gravity)/g.
+    // Approximate from velocity delta over the whole frame + gravity.
+    var pax = (v.x - state._prevVel.x) / dt;
+    var pay = (v.y - state._prevVel.y) / dt + G;
+    var paz = (v.z - state._prevVel.z) / dt;
+    state.gForce = Math.sqrt(pax * pax + pay * pay + paz * paz) / G;
+    if (state.pos.y <= 0 && !state.armed) state.gForce = 1;
+    state._prevVel.x = v.x; state._prevVel.y = v.y; state._prevVel.z = v.z;
+
+    // Per-motor load mix — FL, FR, RL, RR.
+    // Nose-down accel (pitch fwd) loads REAR motors; roll right loads LEFT;
+    // yaw uses opposing prop torque (FL/RR spin one way, FR/RL the other).
+    var base = state._motorOut;
+    var m = state.motors;
+    if (!state.armed || state.crashed) {
+      m[0] = m[1] = m[2] = m[3] = 0;
+      return;
+    }
+    // normalised control efforts (visual mix, not the actual torque solver)
+    var pMix = clamp(-w.pitch / ACRO_MAX_RATE + (state.mode === 'angle' ? -e.pitch / MAX_TILT * 0.5 : 0), -1, 1) * 0.18;
+    var rMix = clamp( w.roll  / ACRO_MAX_RATE + (state.mode === 'angle' ?  e.roll  / MAX_TILT * 0.5 : 0), -1, 1) * 0.18;
+    var yMix = clamp( w.yaw   / MAX_YAW_RATE, -1, 1) * 0.10;
+    var idle = 0.12; // props visibly idle-spin whenever armed
+    // rolling right (rMix+) loads the LEFT motors; pitching nose-down
+    // (pMix+) loads the REAR motors; yaw pairs FL/RR vs FR/RL.
+    m[0] = clamp(base - pMix + rMix + yMix + idle, 0, 1); // FL
+    m[1] = clamp(base - pMix - rMix - yMix + idle, 0, 1); // FR
+    m[2] = clamp(base + pMix + rMix - yMix + idle, 0, 1); // RL
+    m[3] = clamp(base + pMix - rMix + yMix + idle, 0, 1); // RR
+  }
+
+  /* ------------------------------- export -------------------------------- */
+
+  window.DRONE.Physics = {
+    create: create,
+    step: step,
+    reset: reset,
+    setMode: setMode,
+    // exposed tunables (read-only use recommended)
+    constants: {
+      MASS: MASS, G: G, TWR: TWR, MAX_THRUST: MAX_THRUST,
+      MAX_TILT: MAX_TILT, ATT_TAU: ATT_TAU,
+      MAX_YAW_RATE: MAX_YAW_RATE, ACRO_MAX_RATE: ACRO_MAX_RATE,
+      MOTOR_TAU: MOTOR_TAU, DRAG_H: DRAG_H, DRAG_V: DRAG_V,
+      CRASH_VSPEED: CRASH_VSPEED, CRASH_TILT: CRASH_TILT,
+      BATT_RATE: BATT_RATE
+    }
+  };
+})();
+
+</script>
+<script>
+/* ===== world.js ===== */
+/* ==========================================================================
+ * DRONE.World — static level geometry + dynamic environment state
+ * --------------------------------------------------------------------------
+ * Classic script, no modules. Attaches to window.DRONE.World.
+ *
+ * Pure data + update logic. NO rendering, NO DOM access.
+ *
+ * Coordinate system (shared contract): right-handed, y = UP (m),
+ * x = right, z = forward (north). Ground plane at y = 0.
+ *
+ * Public API:
+ *   DRONE.World.create()                  -> world
+ *   DRONE.World.update(world, state, dt)  // mutates world in place
+ *
+ * world = {
+ *   groundSize,                // meters, square ground spans [-S/2, S/2]
+ *   obstacles: [{x,z,w,d,h,color}, ...],       // buildings/boxes/poles
+ *   landmarks: [{x,z,type,scale}, ...],        // trees / pads (visual only)
+ *   gates: [{x,y,z,radius,yaw,passed,index}],  // ordered race course
+ *   wind: {x,y,z},             // current gust vector, m/s
+ *   nextGate: 0,                // index of the next ungated gate (or -1 when
+ *                                // the whole course is complete)
+ *   lap: 0,                     // completed laps around the gate course
+ *   score: 0,                   // total gates passed, all-time
+ *   justPassedGate: false       // true for exactly one update() call after
+ *                                // a gate is passed; main.js can read this
+ *                                // for one-shot fx (sound/flash) then it
+ *                                // resets to false automatically next frame
+ * }
+ * ========================================================================== */
+(function () {
+  'use strict';
+  window.DRONE = window.DRONE || {};
+
+  /* ------------------------------ Tuning ---------------------------------- */
+
+  var GROUND_SIZE = 400;          // meters, square
+
+  // Wind: smooth low-frequency gusts built from a handful of summed sine
+  // waves with slowly drifting random phase/frequency ("pseudo Perlin"),
+  // clamped to a bounded magnitude with occasional stronger gust events.
+  var WIND_BASE_MAX   = 4.0;      // m/s, normal bounded gust magnitude
+  var WIND_GUST_MAX   = 7.5;      // m/s, occasional stronger gust ceiling
+  var WIND_GUST_CHANCE = 0.02;    // probability per second of starting a gust
+  var WIND_GUST_DURATION = [2.5, 5.5]; // seconds, random range
+
+  var GATE_RADIUS = 6;            // meters, ring/square gate opening half-size
+
+  /* ------------------------------ Helpers --------------------------------- */
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function rand(lo, hi) { return lo + Math.random() * (hi - lo); }
+
+  // Smooth pseudo-noise in [-1, 1]: sum of a few sines whose frequencies and
+  // phases are fixed per-axis-per-octave (deterministic given elapsed time),
+  // producing continuous, band-limited wandering without relying on
+  // frame-rate-dependent randomness.
+  function noise1(t, seed) {
+    var a = Math.sin(t * 0.13 + seed * 1.7) * 0.5;
+    var b = Math.sin(t * 0.29 + seed * 3.1 + 1.3) * 0.3;
+    var c = Math.sin(t * 0.071 + seed * 5.9 + 2.6) * 0.2;
+    return a + b + c; // range approx [-1, 1]
+  }
+
+  /* ------------------------------- create ---------------------------------- */
+
+  function makeObstacles() {
+    var o = [];
+    // A small cluster of "buildings" (boxes) off to one side of the course.
+    o.push({ x: -60, z: 40,  w: 14, d: 14, h: 22, color: '#8892a0' });
+    o.push({ x: -40, z: 55,  w: 10, d: 10, h: 34, color: '#7c8794' });
+    o.push({ x: -75, z: 10,  w: 18, d: 12, h: 16, color: '#95a0ac' });
+    o.push({ x: 55,  z: -50, w: 16, d: 16, h: 28, color: '#899', });
+    o.push({ x: 78,  z: -30, w: 12, d: 12, h: 18, color: '#7d8894' });
+
+    // Tall thin poles (comms towers) scattered as hazards near the course.
+    o.push({ x: 20,  z: 70,  w: 1.2, d: 1.2, h: 40, color: '#c0392b' });
+    o.push({ x: -20, z: -60, w: 1.2, d: 1.2, h: 46, color: '#c0392b' });
+    o.push({ x: 90,  z: 20,  w: 1.5, d: 1.5, h: 30, color: '#b33' });
+    o.push({ x: -95, z: -20, w: 1.5, d: 1.5, h: 36, color: '#b33' });
+
+    return o;
+  }
+
+  function makeLandmarks() {
+    var l = [];
+    // Ring of trees around the perimeter for visual reference / parallax.
+    var ringR = 150;
+    var count = 24;
+    for (var i = 0; i < count; i++) {
+      var a = (i / count) * Math.PI * 2;
+      l.push({
+        x: Math.cos(a) * ringR + rand(-8, 8),
+        z: Math.sin(a) * ringR + rand(-8, 8),
+        type: 'tree',
+        scale: rand(0.8, 1.4)
+      });
+    }
+    // Scattered inner trees for midground detail.
+    var innerSpots = [
+      [30, 30], [-30, 20], [45, -10], [-50, -30], [10, -70],
+      [65, 55], [-65, 45], [0, 90], [-15, -95], [100, -5]
+    ];
+    for (var j = 0; j < innerSpots.length; j++) {
+      l.push({ x: innerSpots[j][0], z: innerSpots[j][1], type: 'tree', scale: rand(0.7, 1.2) });
+    }
+    // Home / landing pad at spawn.
+    l.push({ x: 0, z: 0, type: 'pad', scale: 1 });
+    // A couple of extra pads around the course as visual waypoints.
+    l.push({ x: 40, z: 0, type: 'pad', scale: 0.8 });
+    l.push({ x: -20, z: -40, type: 'pad', scale: 0.8 });
+
+    return l;
+  }
+
+  function makeGates() {
+    // An ordered loop of ~5 gates the player flies through in sequence,
+    // varying altitude and heading so it reads as a fun 3D circuit rather
+    // than a flat lap. `yaw` is the gate's facing direction (radians,
+    // same convention as euler.yaw) — the normal the player should fly
+    // through along.
+    var g = [];
+    g.push({ x: 40,  y: 8,  z: 0,   radius: GATE_RADIUS, yaw: Math.PI / 2,      passed: false, index: 0 });
+    g.push({ x: 40,  y: 14, z: -45, radius: GATE_RADIUS, yaw: Math.PI,          passed: false, index: 1 });
+    g.push({ x: -10, y: 20, z: -60, radius: GATE_RADIUS, yaw: Math.PI * 1.35,   passed: false, index: 2 });
+    g.push({ x: -45, y: 12, z: -25, radius: GATE_RADIUS, yaw: Math.PI * 1.85,   passed: false, index: 3 });
+    g.push({ x: -20, y: 6,  z: 15,  radius: GATE_RADIUS, yaw: Math.PI * 0.15,   passed: false, index: 4 });
+    return g;
+  }
+
+  function create() {
+    var world = {
+      groundSize: GROUND_SIZE,
+      obstacles: makeObstacles(),
+      landmarks: makeLandmarks(),
+      gates: makeGates(),
+      wind: { x: 0, y: 0, z: 0 },
+      nextGate: 0,
+      lap: 0,
+      score: 0,
+      justPassedGate: false,
+      // internal wind-gust state (safe for others to ignore)
+      _windT: 0,
+      _windSeedX: rand(0, 1000),
+      _windSeedY: rand(0, 1000),
+      _windSeedZ: rand(0, 1000),
+      _gustActive: false,
+      _gustTimer: 0,
+      _gustStrength: 1
+    };
+    return world;
+  }
+
+  /* ------------------------------ wind update ------------------------------ */
+
+  function updateWind(world, dt) {
+    world._windT += dt;
+    var t = world._windT;
+
+    // Base bounded wandering gust from summed sines per axis.
+    var bx = noise1(t, world._windSeedX);
+    var by = noise1(t * 0.7, world._windSeedY) * 0.35; // vertical gusts gentler
+    var bz = noise1(t, world._windSeedZ);
+
+    // Occasional stronger gust event: random chance to start, ramps in/out
+    // with a smoothstep-ish envelope while active.
+    if (!world._gustActive) {
+      if (Math.random() < WIND_GUST_CHANCE * dt) {
+        world._gustActive = true;
+        world._gustTimer = rand(WIND_GUST_DURATION[0], WIND_GUST_DURATION[1]);
+        world._gustStrength = rand(1.3, WIND_GUST_MAX / WIND_BASE_MAX);
+      }
+    } else {
+      world._gustTimer -= dt;
+      if (world._gustTimer <= 0) {
+        world._gustActive = false;
+        world._gustStrength = 1;
+      }
+    }
+    // Smooth envelope toward current target strength (avoids snapping).
+    var targetStrength = world._gustActive ? world._gustStrength : 1;
+    world._windStrength = world._windStrength === undefined ? 1 : world._windStrength;
+    world._windStrength += (targetStrength - world._windStrength) * clamp(dt * 0.8, 0, 1);
+
+    var mag = WIND_BASE_MAX * world._windStrength;
+    var wx = clamp(bx * mag, -WIND_GUST_MAX, WIND_GUST_MAX);
+    var wy = clamp(by * mag, -WIND_GUST_MAX * 0.35, WIND_GUST_MAX * 0.35);
+    var wz = clamp(bz * mag, -WIND_GUST_MAX, WIND_GUST_MAX);
+
+    // Light smoothing toward new target so wind doesn't jitter frame to frame.
+    var k = clamp(dt * 1.5, 0, 1);
+    world.wind.x += (wx - world.wind.x) * k;
+    world.wind.y += (wy - world.wind.y) * k;
+    world.wind.z += (wz - world.wind.z) * k;
+  }
+
+  /* ------------------------------ gate update ------------------------------- */
+
+  function updateGates(world, state, dt) {
+    world.justPassedGate = false;
+
+    if (world.nextGate < 0 || world.nextGate >= world.gates.length) return;
+
+    var gate = world.gates[world.nextGate];
+    var dx = state.pos.x - gate.x;
+    var dy = state.pos.y - gate.y;
+    var dz = state.pos.z - gate.z;
+
+    // Distance from gate plane along its facing normal, and radial distance
+    // within that plane (so passing through the ring/frame counts, not just
+    // being near the gate's center point in 3-space).
+    var nx = Math.sin(gate.yaw), nz = Math.cos(gate.yaw); // gate facing normal (xz)
+    var along = dx * nx + dz * nz;              // signed distance along normal
+    var lateralX = dx - along * nx;
+    var lateralZ = dz - along * nz;
+    var radial = Math.sqrt(lateralX * lateralX + lateralZ * lateralZ + dy * dy);
+
+    // Track sign of `along` so we can detect crossing the plane this frame.
+    if (gate._prevAlong === undefined) gate._prevAlong = along;
+    var crossedPlane = (gate._prevAlong < 0 && along >= 0) || (gate._prevAlong > 0 && along <= 0) || Math.abs(along) < 0.5;
+    var withinRing = radial <= gate.radius;
+
+    if (!gate.passed && withinRing && crossedPlane) {
+      gate.passed = true;
+      world.justPassedGate = true;
+      world.score += 1;
+      world.nextGate += 1;
+      if (world.nextGate >= world.gates.length) {
+        world.lap += 1;
+        // Loop the course: reopen all gates for another lap.
+        world.nextGate = 0;
+        for (var i = 0; i < world.gates.length; i++) {
+          world.gates[i].passed = false;
+          world.gates[i]._prevAlong = undefined;
+        }
+        return;
+      }
+    }
+
+    gate._prevAlong = along;
+  }
+
+  /* -------------------------------- update ---------------------------------- */
+
+  function update(world, state, dt) {
+    if (!(dt > 0)) return;
+    if (dt > 0.25) dt = 0.25; // guard against huge tab-switch jumps
+
+    updateWind(world, dt);
+    updateGates(world, state, dt);
+  }
+
+  /* -------------------------------- exports ---------------------------------- */
+
+  window.DRONE.World = {
+    create: create,
+    update: update
+  };
+})();
+
+</script>
+<script>
+/* ===== render.js ===== */
+/* ==========================================================================
+ * DRONE.Render — pure 2D-canvas 3D renderer (hand-rolled projection)
+ * --------------------------------------------------------------------------
+ * Classic script, no modules. Attaches to window.DRONE.Render.
+ *
+ * Coordinate system (shared contract): right-handed, y = UP (m),
+ * x = right, z = forward (north). euler.yaw about +y, euler.pitch about +x
+ * (nose up = +), euler.roll about +z (right-down = +). Ground at y = 0.
+ *
+ * Rotation convention matches DRONE.Physics exactly:
+ *   world = Ry(yaw) * Rx(-pitch) * Rz(-roll) * local
+ * (see physics.js bodyUpWorld() for the derivation this mirrors).
+ *
+ * Public API:
+ *   DRONE.Render.init(canvas)
+ *   DRONE.Render.draw(state, world, camMode)   // camMode: 'chase'|'fpv'|'orbit'
+ *   DRONE.Render.resize(w, h)
+ * ========================================================================== */
+(function () {
+  'use strict';
+  window.DRONE = window.DRONE || {};
+
+  /* ------------------------------ constants ------------------------------- */
+  var NEAR        = 0.08;                 // camera-space near clip (m)
+  var FOV_Y       = 62 * Math.PI / 180;   // vertical field of view
+  var MAX_FOG_DIST = 260;                 // grid/objects fade out past this (m)
+  var GRID_STEP   = 8;                    // grid line spacing (m)
+  var GRID_HALF_DEFAULT = 120;            // half-extent of scrolling grid (m)
+
+  var SKY_TOP     = '#2f6fd1';
+  var SKY_HORIZON = '#cfe6ee';
+  var GROUND_NEAR = '#3a6b3d';
+  var GROUND_FAR  = '#a9c2a5';
+
+  var WORLD_UP = { x: 0, y: 1, z: 0 };
+
+  /* Drone geometry (meters, body-local frame: x=right,y=up,z=forward) */
+  var BODY_HALF   = { x: 0.085, y: 0.032, z: 0.125 };
+  var ARM_K       = 0.20 * Math.SQRT1_2;  // motor offset from center per axis
+  var ARM_Y       = 0.015;
+  var MOTOR_R     = 0.028;
+  var PROP_R      = 0.135;
+  var MOTOR_LOCAL = [ // FL, FR, RL, RR
+    { x: -ARM_K, y: ARM_Y, z:  ARM_K },
+    { x:  ARM_K, y: ARM_Y, z:  ARM_K },
+    { x: -ARM_K, y: ARM_Y, z: -ARM_K },
+    { x:  ARM_K, y: ARM_Y, z: -ARM_K }
+  ];
+
+  var FRONT_ARM_COLOR = '#e8443a';
+  var REAR_ARM_COLOR  = '#3a4148';
+  var BODY_COLOR      = '#22262b';
+  var BODY_COLOR_CRASH = '#8a2020';
+  var MOTOR_COLOR     = '#111316';
+  var PROP_COLOR      = '#d8dee3';
+
+  /* -------------------------------- state --------------------------------- */
+  var canvas = null, ctx = null;
+  var W = 0, H = 0, DPR = 1, CX = 0, CY = 0, FOCAL = 1;
+  var lastTime = null;
+
+  var cam = {
+    pos: { x: 0, y: 3, z: -7 },
+    right: { x: 1, y: 0, z: 0 },
+    up: { x: 0, y: 1, z: 0 },
+    forward: { x: 0, y: 0, z: 1 }
+  };
+  var chaseCamPos = { x: 0, y: 3, z: -7 };
+  var chaseLookAt = { x: 0, y: 1, z: 0 };
+  var orbitCamPos = { x: 8, y: 6, z: 0 };
+  var orbitAngle = 0;
+  var camInitialized = false;
+
+  var propAngle = [0, 0, 0, 0];
+  var sparkSeed = 0;
+
+  /* ------------------------------ math utils ------------------------------ */
+  function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+  function dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+  function cross(a, b) {
+    return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+  }
+  function length(a) { return Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z); }
+  function normalize(a) {
+    var l = length(a);
+    if (l < 1e-6) return { x: 0, y: 0, z: 1 };
+    return { x: a.x / l, y: a.y / l, z: a.z / l };
+  }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  // Exact same rotation physics.js applies: world = Ry(yaw)*Rx(-pitch)*Rz(-roll)*local
+  function rotateBodyLocal(local, e, out) {
+    var cy = Math.cos(e.yaw),   sy = Math.sin(e.yaw);
+    var cp = Math.cos(e.pitch), sp = Math.sin(e.pitch);
+    var cr = Math.cos(e.roll),  sr = Math.sin(e.roll);
+    var x1 = local.x * cr + local.y * sr;
+    var y1 = -local.x * sr + local.y * cr;
+    var z1 = local.z;
+    var x2 = x1;
+    var y2 = y1 * cp + z1 * sp;
+    var z2 = -y1 * sp + z1 * cp;
+    var x3 = x2 * cy + z2 * sy;
+    var y3 = y2;
+    var z3 = -x2 * sy + z2 * cy;
+    out.x = x3; out.y = y3; out.z = z3;
+    return out;
+  }
+  var _bx = { x: 0, y: 0, z: 0 }, _by = { x: 0, y: 0, z: 0 }, _bz = { x: 0, y: 0, z: 0 };
+  function bodyAxes(e) {
+    rotateBodyLocal({ x: 1, y: 0, z: 0 }, e, _bx);
+    rotateBodyLocal({ x: 0, y: 1, z: 0 }, e, _by);
+    rotateBodyLocal({ x: 0, y: 0, z: 1 }, e, _bz);
+    return { right: _bx, up: _by, forward: _bz };
+  }
+  function localToWorld(local, origin, basis, out) {
+    out.x = origin.x + basis.right.x * local.x + basis.up.x * local.y + basis.forward.x * local.z;
+    out.y = origin.y + basis.right.y * local.x + basis.up.y * local.y + basis.forward.y * local.z;
+    out.z = origin.z + basis.right.z * local.x + basis.up.z * local.y + basis.forward.z * local.z;
+    return out;
+  }
+
+  /* ------------------------------- camera ---------------------------------- */
+  function buildCamera(pos, target, upHint) {
+    var fwd = normalize(sub(target, pos));
+    var right = normalize(cross(fwd, upHint));
+    if (length(right) < 1e-4) right = { x: 1, y: 0, z: 0 };
+    var up = normalize(cross(right, fwd));
+    cam.pos.x = pos.x; cam.pos.y = pos.y; cam.pos.z = pos.z;
+    cam.forward.x = fwd.x; cam.forward.y = fwd.y; cam.forward.z = fwd.z;
+    cam.right.x = right.x; cam.right.y = right.y; cam.right.z = right.z;
+    cam.up.x = up.x; cam.up.y = up.y; cam.up.z = up.z;
+  }
+
+  function updateCamera(state, world, camMode, dt) {
+    var p = state.pos, e = state.euler;
+    var basis = bodyAxes(e);
+
+    if (camMode === 'fpv') {
+      var nosePos = localToWorld({ x: 0, y: 0.02, z: 0.14 }, p, basis, { x: 0, y: 0, z: 0 });
+      var target = { x: nosePos.x + basis.forward.x * 10, y: nosePos.y + basis.forward.y * 10, z: nosePos.z + basis.forward.z * 10 };
+      buildCamera(nosePos, target, basis.up);
+      chaseCamPos.x = nosePos.x; chaseCamPos.y = nosePos.y; chaseCamPos.z = nosePos.z;
+    } else if (camMode === 'orbit') {
+      orbitAngle += dt * 0.12;
+      var dist = 9, height = 4.2 + clamp(p.y * 0.25, 0, 5);
+      var idealX = p.x + Math.sin(orbitAngle) * dist;
+      var idealZ = p.z + Math.cos(orbitAngle) * dist;
+      var idealY = p.y + height;
+      if (!camInitialized) { orbitCamPos.x = idealX; orbitCamPos.y = idealY; orbitCamPos.z = idealZ; }
+      var k = 1 - Math.exp(-dt * 1.6);
+      orbitCamPos.x = lerp(orbitCamPos.x, idealX, k);
+      orbitCamPos.y = lerp(orbitCamPos.y, idealY, k);
+      orbitCamPos.z = lerp(orbitCamPos.z, idealZ, k);
+      var lookAt = { x: p.x, y: p.y + 0.3, z: p.z };
+      buildCamera(orbitCamPos, lookAt, WORLD_UP);
+    } else { // 'chase' (default)
+      var yaw = e.yaw;
+      var behind = { x: Math.sin(yaw), y: 0, z: Math.cos(yaw) }; // nose direction (flat)
+      var chaseDist = 6.2, chaseHeight = 2.3;
+      var idealPos = {
+        x: p.x - behind.x * chaseDist,
+        y: p.y + chaseHeight,
+        z: p.z - behind.z * chaseDist
+      };
+      if (idealPos.y < 0.6) idealPos.y = 0.6;
+      var idealLook = { x: p.x, y: p.y + 0.35, z: p.z };
+      if (!camInitialized) {
+        chaseCamPos.x = idealPos.x; chaseCamPos.y = idealPos.y; chaseCamPos.z = idealPos.z;
+        chaseLookAt.x = idealLook.x; chaseLookAt.y = idealLook.y; chaseLookAt.z = idealLook.z;
+      }
+      var kp = 1 - Math.exp(-dt * 3.2);
+      var kl = 1 - Math.exp(-dt * 5.5);
+      chaseCamPos.x = lerp(chaseCamPos.x, idealPos.x, kp);
+      chaseCamPos.y = lerp(chaseCamPos.y, idealPos.y, kp);
+      chaseCamPos.z = lerp(chaseCamPos.z, idealPos.z, kp);
+      chaseLookAt.x = lerp(chaseLookAt.x, idealLook.x, kl);
+      chaseLookAt.y = lerp(chaseLookAt.y, idealLook.y, kl);
+      chaseLookAt.z = lerp(chaseLookAt.z, idealLook.z, kl);
+      buildCamera(chaseCamPos, chaseLookAt, WORLD_UP);
+    }
+    camInitialized = true;
+    return basis;
+  }
+
+  function camSpace(p, out) {
+    var rx = p.x - cam.pos.x, ry = p.y - cam.pos.y, rz = p.z - cam.pos.z;
+    out.x = rx * cam.right.x + ry * cam.right.y + rz * cam.right.z;
+    out.y = rx * cam.up.x + ry * cam.up.y + rz * cam.up.z;
+    out.z = rx * cam.forward.x + ry * cam.forward.y + rz * cam.forward.z;
+    return out;
+  }
+  var _cs = { x: 0, y: 0, z: 0 };
+  function projectPoint(p, out) {
+    camSpace(p, _cs);
+    if (_cs.z < NEAR) return null;
+    var scale = FOCAL / _cs.z;
+    out.x = CX + _cs.x * scale;
+    out.y = CY - _cs.y * scale;
+    out.scale = scale;
+    out.depth = _cs.z;
+    return out;
+  }
+
+  /* --------------------------- job pool (painter's algo) ------------------- */
+  var jobs = [];
+  var jobCount = 0;
+  var order = [];
+
+  function ensureJob(i) {
+    var j = jobs[i];
+    if (!j) {
+      j = { kind: 'line', depth: 0, color: '#fff', alpha: 1, lw: 1, dashed: false,
+            ax: 0, ay: 0, bx: 0, by: 0, r: 0, poly: [], polyLen: 0, fill: true,
+            text: '', tx: 0, ty: 0, font: '' };
+      jobs[i] = j;
+    }
+    return j;
+  }
+  function nextJob() { return ensureJob(jobCount++); }
+  function polyPt(j, idx, x, y) {
+    var p = j.poly[idx];
+    if (!p) { p = { x: 0, y: 0 }; j.poly[idx] = p; }
+    p.x = x; p.y = y;
+  }
+
+  var _pa = { x: 0, y: 0, z: 0, scale: 0, depth: 0 };
+  var _pb = { x: 0, y: 0, z: 0, scale: 0, depth: 0 };
+  var _wa = { x: 0, y: 0, z: 0 };
+  var _wb = { x: 0, y: 0, z: 0 };
+
+  // Clip a world-space segment to the near plane (camera space). Returns
+  // false if fully behind. Writes clipped world points into _wa/_wb.
+  function clipNear(p1, p2) {
+    var z1 = dot(sub(p1, cam.pos), cam.forward);
+    var z2 = dot(sub(p2, cam.pos), cam.forward);
+    if (z1 < NEAR && z2 < NEAR) return false;
+    _wa.x = p1.x; _wa.y = p1.y; _wa.z = p1.z;
+    _wb.x = p2.x; _wb.y = p2.y; _wb.z = p2.z;
+    if (z1 < NEAR) {
+      var t = (NEAR - z1) / (z2 - z1);
+      _wa.x = p1.x + (p2.x - p1.x) * t;
+      _wa.y = p1.y + (p2.y - p1.y) * t;
+      _wa.z = p1.z + (p2.z - p1.z) * t;
+    } else if (z2 < NEAR) {
+      var t2 = (NEAR - z2) / (z1 - z2);
+      _wb.x = p2.x + (p1.x - p2.x) * t2;
+      _wb.y = p2.y + (p1.y - p2.y) * t2;
+      _wb.z = p2.z + (p1.z - p2.z) * t2;
+    }
+    return true;
+  }
+
+  function fogAlpha(depth, base) {
+    var f = 1 - clamp(depth / MAX_FOG_DIST, 0, 1);
+    return base * f;
+  }
+
+  function pushLine(p1, p2, color, widthM, alpha, dashed) {
+    if (!clipNear(p1, p2)) return;
+    var a = projectPoint(_wa, _pa);
+    if (!a) return;
+    var scaleA = _pa.scale, ax = _pa.x, ay = _pa.y, depthA = _pa.depth;
+    var b = projectPoint(_wb, _pb);
+    if (!b) return;
+    var j = nextJob();
+    j.kind = 'line';
+    j.depth = (depthA + _pb.depth) * 0.5;
+    j.color = color;
+    j.alpha = fogAlpha(j.depth, alpha);
+    j.lw = clamp(widthM * (scaleA + _pb.scale) * 0.5, 1, 60);
+    j.dashed = !!dashed;
+    j.ax = ax; j.ay = ay; j.bx = _pb.x; j.by = _pb.y;
+  }
+
+  function pushDot(p, radiusM, color, alpha) {
+    var cs = { x: 0, y: 0, z: 0 };
+    camSpace(p, cs);
+    if (cs.z < NEAR) return;
+    var pr = projectPoint(p, _pa);
+    if (!pr) return;
+    var j = nextJob();
+    j.kind = 'dot';
+    j.depth = _pa.depth;
+    j.color = color;
+    j.alpha = fogAlpha(j.depth, alpha);
+    j.r = clamp(radiusM * _pa.scale, 1, 400);
+    j.ax = _pa.x; j.ay = _pa.y;
+  }
+
+  // Oriented box (arbitrary right/up/forward basis), drawn as its visible
+  // (camera-facing) faces only, each a separate depth-sorted poly job.
+  var BOX_CORNER_SIGN = [
+    [-1, -1, -1], [-1, -1, 1], [-1, 1, -1], [-1, 1, 1],
+    [1, -1, -1], [1, -1, 1], [1, 1, -1], [1, 1, 1]
+  ];
+  var BOX_FACES = [
+    [0, 1, 5, 4], // bottom (y-)
+    [2, 6, 7, 3], // top (y+)
+    [0, 2, 3, 1], // left (x-)
+    [4, 5, 7, 6], // right (x+)
+    [0, 4, 6, 2], // back (z-)
+    [1, 3, 7, 5]  // front (z+)
+  ];
+  var _corners = [];
+  for (var _ci = 0; _ci < 8; _ci++) _corners.push({ x: 0, y: 0, z: 0 });
+  var LIGHT_DIR = normalize({ x: -0.4, y: 1, z: -0.35 });
+
+  function pushOrientedBox(center, half, basis, color, alpha) {
+    var i, c;
+    for (i = 0; i < 8; i++) {
+      var s = BOX_CORNER_SIGN[i];
+      c = _corners[i];
+      c.x = center.x + basis.right.x * s[0] * half.x + basis.up.x * s[1] * half.y + basis.forward.x * s[2] * half.z;
+      c.y = center.y + basis.right.y * s[0] * half.x + basis.up.y * s[1] * half.y + basis.forward.y * s[2] * half.z;
+      c.z = center.z + basis.right.z * s[0] * half.x + basis.up.z * s[1] * half.y + basis.forward.z * s[2] * half.z;
+    }
+    for (var f = 0; f < 6; f++) {
+      var idx = BOX_FACES[f];
+      var c0 = _corners[idx[0]], c1 = _corners[idx[1]], c2 = _corners[idx[2]], c3 = _corners[idx[3]];
+      // all 4 corners must be in front of the near plane to keep this simple
+      var z0 = dot(sub(c0, cam.pos), cam.forward);
+      var z1 = dot(sub(c1, cam.pos), cam.forward);
+      var z2 = dot(sub(c2, cam.pos), cam.forward);
+      var z3 = dot(sub(c3, cam.pos), cam.forward);
+      if (z0 < NEAR || z1 < NEAR || z2 < NEAR || z3 < NEAR) continue;
+      var fcx = (c0.x + c1.x + c2.x + c3.x) * 0.25;
+      var fcy = (c0.y + c1.y + c2.y + c3.y) * 0.25;
+      var fcz = (c0.z + c1.z + c2.z + c3.z) * 0.25;
+      var e1x = c1.x - c0.x, e1y = c1.y - c0.y, e1z = c1.z - c0.z;
+      var e2x = c2.x - c0.x, e2y = c2.y - c0.y, e2z = c2.z - c0.z;
+      // Note: for this corner winding, e1 x e2 points INWARD (verified against
+      // BOX_CORNER_SIGN/BOX_FACES), so negate to get the true outward normal.
+      var nx = -(e1y * e2z - e1z * e2y), ny = -(e1z * e2x - e1x * e2z), nz = -(e1x * e2y - e1y * e2x);
+      var nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= nl; ny /= nl; nz /= nl;
+      var toCam = { x: cam.pos.x - fcx, y: cam.pos.y - fcy, z: cam.pos.z - fcz };
+      if (nx * toCam.x + ny * toCam.y + nz * toCam.z <= 0) continue; // back-facing
+      var p0 = projectPoint(c0, _pa); if (!p0) continue;
+      var x0 = _pa.x, y0 = _pa.y, dep = _pa.depth;
+      var p1 = projectPoint(c1, _pa); if (!p1) continue;
+      var x1 = _pa.x, y1 = _pa.y; dep += _pa.depth;
+      var p2 = projectPoint(c2, _pa); if (!p2) continue;
+      var x2 = _pa.x, y2 = _pa.y; dep += _pa.depth;
+      var p3 = projectPoint(c3, _pa); if (!p3) continue;
+      var x3 = _pa.x, y3 = _pa.y; dep += _pa.depth;
+      dep *= 0.25;
+      var shade = clamp(nx * LIGHT_DIR.x + ny * LIGHT_DIR.y + nz * LIGHT_DIR.z, -1, 1) * 0.5 + 0.5;
+      shade = 0.35 + shade * 0.75;
+      var j = nextJob();
+      j.kind = 'poly';
+      j.depth = dep;
+      j.color = shadeColor(color, shade);
+      j.alpha = fogAlpha(dep, alpha);
+      j.fill = true;
+      j.polyLen = 4;
+      polyPt(j, 0, x0, y0); polyPt(j, 1, x1, y1); polyPt(j, 2, x2, y2); polyPt(j, 3, x3, y3);
+    }
+  }
+
+  function pushPoly(pts, color, alpha, fill, lw, depthOverride) {
+    var n = pts.length, i, avgDepth = 0, ok = true, sx = [], sy = [];
+    for (i = 0; i < n; i++) {
+      var pr = projectPoint(pts[i], _pa);
+      if (!pr) { ok = false; break; }
+      sx.push(_pa.x); sy.push(_pa.y); avgDepth += _pa.depth;
+    }
+    if (!ok) return;
+    avgDepth /= n;
+    var j = nextJob();
+    j.kind = 'poly';
+    j.depth = depthOverride != null ? depthOverride : avgDepth;
+    j.color = color;
+    j.alpha = fogAlpha(j.depth, alpha);
+    j.fill = fill;
+    j.lw = lw || 1;
+    j.polyLen = n;
+    for (i = 0; i < n; i++) polyPt(j, i, sx[i], sy[i]);
+  }
+
+  var HEX6_RE = /^#[0-9a-fA-F]{6}$/;
+  function shadeColor(hex, mul) {
+    if (typeof hex !== 'string' || !HEX6_RE.test(hex)) return hex; // defensive: unknown color format, skip shading
+    var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    r = clamp(Math.round(r * mul), 0, 255);
+    g = clamp(Math.round(g * mul), 0, 255);
+    b = clamp(Math.round(b * mul), 0, 255);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+
+  /* ---------------------------- world helpers ------------------------------ */
+  function getPos(o) {
+    if (o.pos) return o.pos;
+    if (o.position) return o.position;
+    return { x: o.x || 0, y: o.y || 0, z: o.z || 0 };
+  }
+  function getYaw(o) { return o.yaw != null ? o.yaw : (o.heading != null ? o.heading : 0); }
+
+  function yawBasis(yaw) {
+    var c = Math.cos(yaw), s = Math.sin(yaw);
+    return {
+      right: { x: c, y: 0, z: -s },
+      up: WORLD_UP,
+      forward: { x: s, y: 0, z: c }
+    };
+  }
+
+  function addObstacle(o) {
+    var p = getPos(o);
+    var type = o.type || 'box';
+    if (type === 'pole' || type === 'pylon' || type === 'tree') {
+      var height = o.height != null ? o.height : (o.size ? o.size.y : 3.2);
+      var radius = o.radius != null ? o.radius : (o.size ? o.size.x * 0.5 : 0.16);
+      var color = o.color || '#9a6b3a';
+      var base = { x: p.x, y: p.y || 0, z: p.z };
+      var top = { x: p.x, y: (p.y || 0) + height, z: p.z };
+      pushLine(base, top, color, radius * 2, 0.95, false);
+      pushDot(top, radius * 1.4, o.capColor || color, 0.95);
+    } else {
+      var half = o.size ? { x: o.size.x * 0.5, y: o.size.y * 0.5, z: o.size.z * 0.5 } : { x: 0.6, y: 0.6, z: 0.6 };
+      var baseY = p.y || 0;
+      var center = { x: p.x, y: baseY + half.y, z: p.z };
+      pushOrientedBox(center, half, yawBasis(getYaw(o)), o.color || '#7c8591', 0.95);
+    }
+  }
+
+  function addGate(g) {
+    var p = getPos(g);
+    var yaw = getYaw(g);
+    var w = g.width != null ? g.width : (g.radius != null ? g.radius * 2 : 2.6);
+    var h = g.height != null ? g.height : (g.radius != null ? g.radius * 2 : 2.6);
+    var color = g.color || (g.passed ? '#4ade80' : '#f97316');
+    var right = { x: Math.cos(yaw), y: 0, z: -Math.sin(yaw) };
+    var baseY = p.y != null ? p.y : h / 2;
+    function pt(u, v) { return { x: p.x + right.x * u, y: baseY + v, z: p.z + right.z * u }; }
+    if (g.shape === 'ring' || (g.radius != null && g.shape !== 'square')) {
+      var segs = 16, rx = w / 2, ry = h / 2, prev = null;
+      for (var i = 0; i <= segs; i++) {
+        var a = (i / segs) * Math.PI * 2;
+        var cur = pt(Math.cos(a) * rx, Math.sin(a) * ry);
+        if (prev) pushLine(prev, cur, color, 0.11, 1, false);
+        prev = cur;
+      }
+    } else {
+      var hw = w / 2, hh = h / 2;
+      var c0 = pt(-hw, -hh), c1 = pt(hw, -hh), c2 = pt(hw, hh), c3 = pt(-hw, hh);
+      pushLine(c0, c1, color, 0.12, 1, false);
+      pushLine(c1, c2, color, 0.12, 1, false);
+      pushLine(c2, c3, color, 0.12, 1, false);
+      pushLine(c3, c0, color, 0.12, 1, false);
+    }
+  }
+
+  function addLandmark(l) {
+    var p = getPos(l);
+    var color = l.color || '#c9a227';
+    var baseY = p.y || 0;
+    var height = l.height != null ? l.height : 1.6;
+    var top = { x: p.x, y: baseY + height, z: p.z };
+    pushLine({ x: p.x, y: baseY, z: p.z }, top, color, 0.1, 0.9, false);
+    pushDot(top, 0.22, color, 0.95);
+    if (l.name || l.label) {
+      var pr = projectPoint(top, _pa);
+      if (pr) {
+        var j = nextJob();
+        j.kind = 'text';
+        j.depth = _pa.depth;
+        j.color = '#ffffff';
+        j.alpha = fogAlpha(j.depth, 0.85);
+        j.tx = _pa.x; j.ty = _pa.y - 12;
+        j.text = l.name || l.label;
+        j.font = clamp(13 * _pa.scale * 3, 9, 15) + 'px sans-serif';
+      }
+    }
+  }
+
+  /* ------------------------------- ground ---------------------------------- */
+  function drawSkyAndGround(world) {
+    // Eye-level horizon: project a distant point along the flattened camera
+    // forward direction at the camera's own height.
+    var flat = normalize({ x: cam.forward.x, y: 0, z: cam.forward.z });
+    var horizonY = CY;
+    if (length(flat) > 0.01) {
+      var far = { x: cam.pos.x + flat.x * 1000, y: cam.pos.y, z: cam.pos.z + flat.z * 1000 };
+      var pr = projectPoint(far, _pa);
+      if (pr) horizonY = _pa.y;
+    }
+    horizonY = clamp(horizonY, -H * 0.5, H * 1.5);
+    var hy = clamp(horizonY, 0, H);
+
+    if (hy > 0) {
+      var skyGrad = ctx.createLinearGradient(0, 0, 0, hy);
+      skyGrad.addColorStop(0, SKY_TOP);
+      skyGrad.addColorStop(1, SKY_HORIZON);
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, W, hy);
+    }
+    if (hy < H) {
+      var groundGrad = ctx.createLinearGradient(0, hy, 0, H);
+      groundGrad.addColorStop(0, GROUND_FAR);
+      groundGrad.addColorStop(1, GROUND_NEAR);
+      ctx.fillStyle = groundGrad;
+      ctx.fillRect(0, hy, W, H - hy);
+    }
+  }
+
+  function addGroundGrid(world, dronePos) {
+    var half = (world && world.groundSize ? world.groundSize : GRID_HALF_DEFAULT * 2) / 2;
+    half = Math.min(half, MAX_FOG_DIST);
+    var n = Math.floor(half / GRID_STEP);
+    var cxw = Math.round(dronePos.x / GRID_STEP) * GRID_STEP;
+    var czw = Math.round(dronePos.z / GRID_STEP) * GRID_STEP;
+    var color = 'rgba(225,238,220,1)';
+    for (var i = -n; i <= n; i++) {
+      var x = cxw + i * GRID_STEP;
+      var d1 = { x: x, y: 0, z: czw - half };
+      var d2 = { x: x, y: 0, z: czw + half };
+      pushLine(d1, d2, color, 0.04, 0.28, false);
+      var z = czw + i * GRID_STEP;
+      var l1 = { x: cxw - half, y: 0, z: z };
+      var l2 = { x: cxw + half, y: 0, z: z };
+      pushLine(l1, l2, color, 0.04, 0.28, false);
+    }
+  }
+
+  /* -------------------------------- drone ----------------------------------- */
+  var _motorWorld = [
+    { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }
+  ];
+  function drawDrone(state, basis, dt) {
+    var p = state.pos;
+    var crashed = !!state.crashed;
+    var motors = state.motors || [0, 0, 0, 0];
+    var i;
+
+    for (i = 0; i < 4; i++) localToWorld(MOTOR_LOCAL[i], p, basis, _motorWorld[i]);
+
+    // shadow on ground, scales/softens with altitude
+    var alt = Math.max(0, p.y);
+    var shadowGround = { x: p.x, y: 0, z: p.z };
+    var sp = projectPoint(shadowGround, _pa);
+    if (sp) {
+      var shrink = 1 / (1 + alt * 0.18);
+      var baseR = 0.34 * _pa.scale * shrink;
+      var fade = clamp(1 - alt * 0.05, 0.08, 0.55);
+      var j = nextJob();
+      j.kind = 'shadow';
+      j.depth = _pa.depth + 0.001; // sits just at ground level
+      j.ax = _pa.x; j.ay = _pa.y;
+      j.r = Math.max(2, baseR);
+      j.alpha = fade;
+      j.color = '#000000';
+    }
+
+    // altitude drop line
+    if (alt > 0.05) {
+      pushLine({ x: p.x, y: p.y, z: p.z }, shadowGround, '#e8f0ff', 0.012, 0.5, true);
+    }
+
+    // arms (front pair tinted distinctly)
+    var bodyColor = crashed ? BODY_COLOR_CRASH : BODY_COLOR;
+    pushLine(p, _motorWorld[0], FRONT_ARM_COLOR, 0.018, 1, false);
+    pushLine(p, _motorWorld[1], FRONT_ARM_COLOR, 0.018, 1, false);
+    pushLine(p, _motorWorld[2], REAR_ARM_COLOR, 0.018, 1, false);
+    pushLine(p, _motorWorld[3], REAR_ARM_COLOR, 0.018, 1, false);
+
+    // central body
+    pushOrientedBox(p, BODY_HALF, basis, bodyColor, 1);
+
+    // motor hubs
+    for (i = 0; i < 4; i++) pushDot(_motorWorld[i], MOTOR_R, MOTOR_COLOR, 1);
+
+    // props: spin speed follows per-motor load; disarmed/idle -> static blades
+    for (i = 0; i < 4; i++) {
+      var load = motors[i] != null ? motors[i] : 0;
+      var spinRate = state.armed ? (5 + load * 55) : load * 8;
+      propAngle[i] += spinRate * dt;
+      var mp = _motorWorld[i];
+      if (load < 0.1 && !state.armed) {
+        // static prop: two thin blade lines
+        var a0 = propAngle[i];
+        var b0x = Math.cos(a0) * PROP_R, b0z = Math.sin(a0) * PROP_R;
+        var e1 = localToWorld({ x: b0x, y: 0.005, z: b0z }, mp, basis, { x: 0, y: 0, z: 0 });
+        var e2 = localToWorld({ x: -b0x, y: 0.005, z: -b0z }, mp, basis, { x: 0, y: 0, z: 0 });
+        pushLine(e1, e2, PROP_COLOR, 0.01, 0.9, false);
+      } else {
+        var segs = 8;
+        var wpts = [];
+        for (var s2 = 0; s2 < segs; s2++) {
+          var a2 = propAngle[i] + (s2 / segs) * Math.PI * 2;
+          wpts.push(localToWorld({ x: Math.cos(a2) * PROP_R, y: 0.006, z: Math.sin(a2) * PROP_R }, mp, basis, { x: 0, y: 0, z: 0 }));
+        }
+        var blurAlpha = clamp(0.18 + load * 0.35, 0.15, 0.5);
+        pushPoly(wpts, PROP_COLOR, blurAlpha, true, 1);
+      }
+    }
+
+    // crash sparks: cheap deterministic-ish flicker near the body
+    if (crashed) {
+      sparkSeed += dt;
+      var sparkCount = 5;
+      for (i = 0; i < sparkCount; i++) {
+        var rnd = Math.sin(sparkSeed * 37.1 + i * 91.7) * 0.5 + 0.5;
+        var rnd2 = Math.sin(sparkSeed * 53.3 + i * 17.3) * 0.5 + 0.5;
+        var ang = rnd * Math.PI * 2;
+        var rad = 0.08 + rnd2 * 0.18;
+        var from = { x: p.x, y: p.y + 0.03, z: p.z };
+        var to = { x: p.x + Math.cos(ang) * rad, y: p.y + 0.03 + (rnd2 - 0.3) * 0.15, z: p.z + Math.sin(ang) * rad };
+        pushLine(from, to, rnd > 0.5 ? '#ffd24a' : '#ff6a3a', 0.012, 0.9, false);
+      }
+    }
+  }
+
+  /* ------------------------------- execution -------------------------------- */
+  function sortAndDraw() {
+    order.length = jobCount;
+    for (var k = 0; k < jobCount; k++) order[k] = k;
+    order.sort(function (a, b) { return jobs[b].depth - jobs[a].depth; });
+
+    for (var i = 0; i < jobCount; i++) {
+      var j = jobs[order[i]];
+      execJob(j);
+    }
+  }
+
+  function execJob(j) {
+    if (j.alpha <= 0.003) return;
+    ctx.globalAlpha = clamp(j.alpha, 0, 1);
+    if (j.kind === 'line') {
+      ctx.strokeStyle = j.color;
+      ctx.lineWidth = j.lw;
+      ctx.lineCap = 'round';
+      if (j.dashed) ctx.setLineDash([Math.max(3, j.lw * 2), Math.max(3, j.lw * 2)]);
+      ctx.beginPath();
+      ctx.moveTo(j.ax, j.ay);
+      ctx.lineTo(j.bx, j.by);
+      ctx.stroke();
+      if (j.dashed) ctx.setLineDash(EMPTY_DASH);
+    } else if (j.kind === 'poly') {
+      var n = j.polyLen;
+      if (n < 2) { ctx.globalAlpha = 1; return; }
+      ctx.beginPath();
+      ctx.moveTo(j.poly[0].x, j.poly[0].y);
+      for (var i = 1; i < n; i++) ctx.lineTo(j.poly[i].x, j.poly[i].y);
+      if (j.fill) {
+        ctx.closePath();
+        ctx.fillStyle = j.color;
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = j.color;
+        ctx.lineWidth = j.lw;
+        ctx.stroke();
+      }
+    } else if (j.kind === 'dot') {
+      ctx.beginPath();
+      ctx.arc(j.ax, j.ay, j.r, 0, Math.PI * 2);
+      ctx.fillStyle = j.color;
+      ctx.fill();
+    } else if (j.kind === 'shadow') {
+      var rx = j.r, ry = j.r * 0.45;
+      var grad = ctx.createRadialGradient(j.ax, j.ay, 0, j.ax, j.ay, rx);
+      grad.addColorStop(0, 'rgba(0,0,0,' + j.alpha.toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(j.ax, j.ay, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (j.kind === 'text') {
+      ctx.fillStyle = j.color;
+      ctx.font = j.font || '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(j.text, j.tx, j.ty);
+    }
+    ctx.globalAlpha = 1;
+  }
+  var EMPTY_DASH = [];
+
+  /* --------------------------------- API -------------------------------------- */
+  function init(c) {
+    canvas = c;
+    ctx = canvas.getContext('2d');
+    var w = canvas.clientWidth || canvas.width || 300;
+    var h = canvas.clientHeight || canvas.height || 150;
+    resize(w, h);
+    lastTime = null;
+    camInitialized = false;
+  }
+
+  function resize(w, h) {
+    if (!canvas) return;
+    DPR = window.devicePixelRatio || 1;
+    W = Math.max(1, w);
+    H = Math.max(1, h);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    if (ctx) ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    CX = W / 2;
+    CY = H / 2;
+    FOCAL = (H / 2) / Math.tan(FOV_Y / 2);
+  }
+
+  function draw(state, world, camMode) {
+    if (!ctx) return;
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    var dt = lastTime == null ? 1 / 60 : (now - lastTime) / 1000;
+    lastTime = now;
+    dt = clamp(dt, 0, 0.1);
+
+    jobCount = 0;
+
+    var basis = updateCamera(state, world, camMode || 'chase', dt);
+
+    ctx.clearRect(0, 0, W, H);
+    drawSkyAndGround(world);
+
+    addGroundGrid(world, state.pos);
+
+    if (world && world.obstacles) {
+      for (var i = 0; i < world.obstacles.length; i++) addObstacle(world.obstacles[i]);
+    }
+    if (world && world.gates) {
+      for (var g = 0; g < world.gates.length; g++) addGate(world.gates[g]);
+    }
+    if (world && world.landmarks) {
+      for (var l = 0; l < world.landmarks.length; l++) addLandmark(world.landmarks[l]);
+    }
+
+    drawDrone(state, basis, dt);
+
+    sortAndDraw();
+  }
+
+  window.DRONE.Render = {
+    init: init,
+    draw: draw,
+    resize: resize
+  };
+})();
+
+</script>
+<script>
+/* ===== controls.js ===== */
+/* ==========================================================================
+ * DRONE.Controls — Mode-2 touch transmitter UI
+ * --------------------------------------------------------------------------
+ * Classic script, no modules. Attaches to window.DRONE.Controls.
+ * Optimised for a PHONE held in LANDSCAPE. Builds its own DOM + injects a
+ * scoped <style> block (prefix ".dctl-"). No external assets, no CDN.
+ *
+ * MODE 2 layout:
+ *   LEFT  stick horizontal = YAW      (-1..1, self-centres)
+ *   LEFT  stick vertical   = THROTTLE ( 0..1, ABSOLUTE — does NOT self-centre)
+ *   RIGHT stick horizontal = ROLL     (-1..1, self-centres)
+ *   RIGHT stick vertical   = PITCH    (-1..1, self-centres)
+ *
+ * Public API:
+ *   DRONE.Controls.init(container)   // builds touch UI inside container el
+ *   DRONE.Controls.read()            -> {throttle, yaw, pitch, roll}
+ *   DRONE.Controls.on(name, fn)      // names: 'arm','reset','mode','camera'
+ *   DRONE.Controls.setArmed(bool)    // reflect armed state on the ARM button
+ * ========================================================================== */
+(function () {
+  'use strict';
+  window.DRONE = window.DRONE || {};
+
+  var DEADZONE = 0.06;          // normalised deadzone near centre
+  var CLASS_PREFIX = 'dctl-';
+
+  /* ------------------------------------------------------------------ *
+   * Internal state
+   * ------------------------------------------------------------------ */
+  var listeners = { arm: [], reset: [], mode: [], camera: [] };
+  var armed = false;
+
+  // Stick model: each stick tracks its own active pointerId so both
+  // thumbs can drive left+right simultaneously without stealing input.
+  var leftStick = null;
+  var rightStick = null;
+
+  // Current normalised axis values (persist across frames).
+  var axes = {
+    throttle: 0,   // 0..1, ABSOLUTE, holds on release
+    yaw: 0,        // -1..1, self-centres
+    pitch: 0,      // -1..1, self-centres
+    roll: 0        // -1..1, self-centres
+  };
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function applyDeadzone(v) {
+    if (Math.abs(v) < DEADZONE) return 0;
+    // rescale so output still spans -1..1 (or 0..1) smoothly past the deadzone
+    var s = v > 0 ? 1 : -1;
+    return s * (Math.abs(v) - DEADZONE) / (1 - DEADZONE);
+  }
+
+  function fire(name) {
+    var fns = listeners[name];
+    if (!fns) return;
+    for (var i = 0; i < fns.length; i++) {
+      try { fns[i](); } catch (e) { /* swallow — one bad handler shouldn't kill input loop */ }
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Stick factory — builds a circular base + draggable knob, wires
+   * Pointer Events with per-stick pointerId tracking (multi-touch safe).
+   * ------------------------------------------------------------------ */
+  function createStick(opts) {
+    // opts: { base, knob, radius, selfCentreX, selfCentreY, onMove(nx, ny) }
+    var stick = {
+      pointerId: null,
+      nx: 0,       // normalised horizontal -1..1
+      ny: 0,       // normalised vertical   -1..1 (ny = +1 is UP)
+      base: opts.base,
+      knob: opts.knob,
+      radius: opts.radius,
+      selfCentreX: opts.selfCentreX,
+      selfCentreY: opts.selfCentreY
+    };
+
+    function setKnobFromClient(clientX, clientY) {
+      var rect = stick.base.getBoundingClientRect();
+      var cx = rect.left + rect.width / 2;
+      var cy = rect.top + rect.height / 2;
+      var dx = clientX - cx;
+      var dy = clientY - cy;
+      var r = rect.width / 2;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > r) {
+        var k = r / dist;
+        dx *= k;
+        dy *= k;
+      }
+      stick.nx = clamp(dx / r, -1, 1);
+      stick.ny = clamp(-dy / r, -1, 1); // invert so up = +1
+      stick.knob.style.transform = 'translate(-50%, -50%) translate(' + dx + 'px,' + dy + 'px)';
+      if (opts.onMove) opts.onMove(stick.nx, stick.ny);
+    }
+
+    function resetKnobVisual() {
+      var visX = stick.selfCentreX ? 0 : stick.nx;
+      var visY = stick.selfCentreY ? 0 : stick.ny;
+      var r = stick.base.getBoundingClientRect().width / 2;
+      stick.knob.style.transform = 'translate(-50%, -50%) translate(' + (visX * r) + 'px,' + (visY * r) + 'px)';
+    }
+
+    function onPointerDown(ev) {
+      if (stick.pointerId !== null) return; // stick already owned by another finger
+      stick.pointerId = ev.pointerId;
+      stick.base.classList.add(CLASS_PREFIX + 'active');
+      try { stick.base.setPointerCapture(ev.pointerId); } catch (e) {}
+      setKnobFromClient(ev.clientX, ev.clientY);
+      ev.preventDefault();
+    }
+
+    function onPointerMove(ev) {
+      if (ev.pointerId !== stick.pointerId) return;
+      setKnobFromClient(ev.clientX, ev.clientY);
+      ev.preventDefault();
+    }
+
+    function onPointerUp(ev) {
+      if (ev.pointerId !== stick.pointerId) return;
+      stick.pointerId = null;
+      stick.base.classList.remove(CLASS_PREFIX + 'active');
+      try { stick.base.releasePointerCapture(ev.pointerId); } catch (e) {}
+
+      // Self-centring per-axis (Mode-2 left stick: yaw centres, throttle holds)
+      if (stick.selfCentreX) stick.nx = 0;
+      if (stick.selfCentreY) stick.ny = 0;
+      resetKnobVisual();
+      if (opts.onMove) opts.onMove(stick.nx, stick.ny);
+      ev.preventDefault();
+    }
+
+    // Programmatically set the knob (used for auto-takeoff / resetting throttle).
+    // Ignored while a finger is actively driving this stick so we never fight the user.
+    stick.setAxis = function (nx, ny) {
+      if (stick.pointerId !== null) return;
+      stick.nx = clamp(nx, -1, 1);
+      stick.ny = clamp(ny, -1, 1);
+      var r = stick.base.getBoundingClientRect().width / 2;
+      stick.knob.style.transform =
+        'translate(-50%, -50%) translate(' + (stick.nx * r) + 'px,' + (-stick.ny * r) + 'px)';
+      if (opts.onMove) opts.onMove(stick.nx, stick.ny);
+    };
+
+    stick.base.addEventListener('pointerdown', onPointerDown, { passive: false });
+    stick.base.addEventListener('pointermove', onPointerMove, { passive: false });
+    stick.base.addEventListener('pointerup', onPointerUp, { passive: false });
+    stick.base.addEventListener('pointercancel', onPointerUp, { passive: false });
+    // Pointer may leave the base bounds while captured — still tracked via
+    // setPointerCapture, so leaving the element does not drop the drag.
+
+    return stick;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * CSS (scoped, injected once)
+   * ------------------------------------------------------------------ */
+  function injectStyle() {
+    if (document.getElementById('dctl-style')) return;
+    var css = '' +
+      '.dctl-root{position:absolute;inset:0;overflow:hidden;touch-action:none;' +
+        'user-select:none;-webkit-user-select:none;font-family:-apple-system,BlinkMacSystemFont,' +
+        '"Segoe UI",Roboto,sans-serif;z-index:20;}' +
+      '.dctl-root *{box-sizing:border-box;touch-action:none;}' +
+      '.dctl-stick-zone{position:absolute;bottom:0;width:46%;height:78%;max-width:340px;}' +
+      '.dctl-stick-zone.dctl-left{left:0;}' +
+      '.dctl-stick-zone.dctl-right{right:0;}' +
+      '.dctl-base{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);' +
+        'width:min(34vw,220px);height:min(34vw,220px);border-radius:50%;' +
+        'background:radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06), rgba(10,14,20,0.55) 70%);' +
+        'border:2px solid rgba(140,200,255,0.25);' +
+        'box-shadow:inset 0 0 22px rgba(0,0,0,0.55), 0 0 18px rgba(0,0,0,0.35);' +
+        'pointer-events:auto;}' +
+      '.dctl-base.dctl-active{border-color:rgba(120,220,255,0.75);' +
+        'box-shadow:inset 0 0 22px rgba(0,0,0,0.55), 0 0 26px rgba(80,200,255,0.45);}' +
+      '.dctl-guide{position:absolute;background:rgba(160,210,255,0.18);pointer-events:none;}' +
+      '.dctl-guide.dctl-h{left:8%;right:8%;top:50%;height:1px;transform:translateY(-50%);}' +
+      '.dctl-guide.dctl-v{top:8%;bottom:8%;left:50%;width:1px;transform:translateX(-50%);}' +
+      '.dctl-base.dctl-throttle .dctl-guide.dctl-h{display:none;}' +
+      '.dctl-center-dot{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;' +
+        'border-radius:50%;background:rgba(160,210,255,0.35);pointer-events:none;}' +
+      '.dctl-knob{position:absolute;left:50%;top:50%;width:38%;height:38%;border-radius:50%;' +
+        'transform:translate(-50%,-50%);' +
+        'background:linear-gradient(160deg, rgba(90,220,255,0.95), rgba(20,90,140,0.9));' +
+        'border:2px solid rgba(220,250,255,0.85);' +
+        'box-shadow:0 4px 14px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.25);' +
+        'pointer-events:none;}' +
+      '.dctl-label{position:absolute;bottom:2%;left:50%;transform:translateX(-50%);' +
+        'font-size:11px;letter-spacing:.12em;color:rgba(190,220,255,0.55);pointer-events:none;' +
+        'text-transform:uppercase;}' +
+      '.dctl-topbar{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;' +
+        'padding:8px 10px;pointer-events:none;}' +
+      '.dctl-btn-group{display:flex;gap:8px;pointer-events:auto;}' +
+      '.dctl-btn{appearance:none;border:1px solid rgba(150,200,255,0.35);border-radius:10px;' +
+        'background:linear-gradient(180deg, rgba(30,38,50,0.85), rgba(14,18,26,0.9));' +
+        'color:#cfe6ff;font-size:12px;font-weight:600;letter-spacing:.06em;' +
+        'padding:9px 14px;min-width:64px;text-transform:uppercase;' +
+        'box-shadow:0 3px 10px rgba(0,0,0,0.4);' +
+        'text-align:center;-webkit-tap-highlight-color:transparent;}' +
+      '.dctl-btn:active{transform:translateY(1px) scale(0.97);}' +
+      '.dctl-btn.dctl-arm{border-color:rgba(120,255,160,0.4);}' +
+      '.dctl-btn.dctl-arm.dctl-armed{background:linear-gradient(180deg, rgba(60,220,120,0.95), rgba(20,120,60,0.95));' +
+        'color:#04180a;border-color:rgba(180,255,200,0.9);' +
+        'box-shadow:0 0 16px rgba(80,255,140,0.55), 0 3px 10px rgba(0,0,0,0.4);}' +
+      '.dctl-btn.dctl-mode{min-width:78px;}' +
+      '.dctl-readout{position:absolute;top:6px;left:50%;transform:translateX(-50%);' +
+        'font-size:10px;color:rgba(180,210,255,0.4);letter-spacing:.08em;pointer-events:none;' +
+        'white-space:nowrap;text-transform:uppercase;}' +
+      '';
+    var style = document.createElement('style');
+    style.id = 'dctl-style';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Button factory
+   * ------------------------------------------------------------------ */
+  function makeButton(label, extraClass) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = CLASS_PREFIX + 'btn' + (extraClass ? ' ' + extraClass : '');
+    btn.textContent = label;
+    return btn;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * init(container)
+   * ------------------------------------------------------------------ */
+  function init(container) {
+    if (!container) throw new Error('DRONE.Controls.init requires a container element');
+    injectStyle();
+
+    var root = document.createElement('div');
+    root.className = CLASS_PREFIX + 'root';
+
+    /* ---- Left stick zone: THROTTLE (vertical, absolute) + YAW (horiz, centring) ---- */
+    var leftZone = document.createElement('div');
+    leftZone.className = CLASS_PREFIX + 'stick-zone ' + CLASS_PREFIX + 'left';
+
+    var leftBase = document.createElement('div');
+    leftBase.className = CLASS_PREFIX + 'base ' + CLASS_PREFIX + 'throttle';
+    var leftGuideH = document.createElement('div');
+    leftGuideH.className = CLASS_PREFIX + 'guide ' + CLASS_PREFIX + 'h';
+    var leftGuideV = document.createElement('div');
+    leftGuideV.className = CLASS_PREFIX + 'guide ' + CLASS_PREFIX + 'v';
+    var leftDot = document.createElement('div');
+    leftDot.className = CLASS_PREFIX + 'center-dot';
+    var leftKnob = document.createElement('div');
+    leftKnob.className = CLASS_PREFIX + 'knob';
+    leftBase.appendChild(leftGuideH);
+    leftBase.appendChild(leftGuideV);
+    leftBase.appendChild(leftDot);
+    leftBase.appendChild(leftKnob);
+
+    var leftLabel = document.createElement('div');
+    leftLabel.className = CLASS_PREFIX + 'label';
+    leftLabel.textContent = 'Throttle / Yaw';
+
+    leftZone.appendChild(leftBase);
+    leftZone.appendChild(leftLabel);
+
+    /* ---- Right stick zone: PITCH (vertical, centring) + ROLL (horiz, centring) ---- */
+    var rightZone = document.createElement('div');
+    rightZone.className = CLASS_PREFIX + 'stick-zone ' + CLASS_PREFIX + 'right';
+
+    var rightBase = document.createElement('div');
+    rightBase.className = CLASS_PREFIX + 'base';
+    var rightGuideH = document.createElement('div');
+    rightGuideH.className = CLASS_PREFIX + 'guide ' + CLASS_PREFIX + 'h';
+    var rightGuideV = document.createElement('div');
+    rightGuideV.className = CLASS_PREFIX + 'guide ' + CLASS_PREFIX + 'v';
+    var rightDot = document.createElement('div');
+    rightDot.className = CLASS_PREFIX + 'center-dot';
+    var rightKnob = document.createElement('div');
+    rightKnob.className = CLASS_PREFIX + 'knob';
+    rightBase.appendChild(rightGuideH);
+    rightBase.appendChild(rightGuideV);
+    rightBase.appendChild(rightDot);
+    rightBase.appendChild(rightKnob);
+
+    var rightLabel = document.createElement('div');
+    rightLabel.className = CLASS_PREFIX + 'label';
+    rightLabel.textContent = 'Pitch / Roll';
+
+    rightZone.appendChild(rightBase);
+    rightZone.appendChild(rightLabel);
+
+    /* ---- Top bar: ARM (left), MODE + CAMERA + RESET (right) ---- */
+    var topbar = document.createElement('div');
+    topbar.className = CLASS_PREFIX + 'topbar';
+
+    var leftGroup = document.createElement('div');
+    leftGroup.className = CLASS_PREFIX + 'btn-group';
+    var armBtn = makeButton('Arm', CLASS_PREFIX + 'arm');
+    leftGroup.appendChild(armBtn);
+
+    var rightGroup = document.createElement('div');
+    rightGroup.className = CLASS_PREFIX + 'btn-group';
+    var modeBtn = makeButton('Angle', CLASS_PREFIX + 'mode');
+    var camBtn = makeButton('Cam', CLASS_PREFIX + 'camera');
+    var resetBtn = makeButton('Reset', CLASS_PREFIX + 'reset');
+    rightGroup.appendChild(modeBtn);
+    rightGroup.appendChild(camBtn);
+    rightGroup.appendChild(resetBtn);
+
+    topbar.appendChild(leftGroup);
+    topbar.appendChild(rightGroup);
+
+    var readout = document.createElement('div');
+    readout.className = CLASS_PREFIX + 'readout';
+    readout.id = 'dctl-readout';
+
+    root.appendChild(leftZone);
+    root.appendChild(rightZone);
+    root.appendChild(topbar);
+    root.appendChild(readout);
+    container.appendChild(root);
+
+    // Prevent scroll/zoom/callout on the whole control surface.
+    root.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    root.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+    root.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    root.style.webkitTouchCallout = 'none';
+
+    /* ---- Wire up sticks ---- */
+    leftStick = createStick({
+      base: leftBase,
+      knob: leftKnob,
+      selfCentreX: true,   // yaw self-centres
+      selfCentreY: false,  // throttle holds position
+      onMove: function (nx, ny) {
+        var y = applyDeadzone(nx);
+        axes.yaw = clamp(y, -1, 1);
+        // throttle: vertical -1..1 -> 0..1, absolute, no deadzone (full range needed)
+        axes.throttle = clamp((ny + 1) / 2, 0, 1);
+      }
+    });
+    // Throttle starts at 0 (bottom) on spawn — place knob there visually.
+    leftKnob.style.transform = 'translate(-50%, -50%) translate(0px,' + (leftBase.clientWidth / 2) + 'px)';
+
+    rightStick = createStick({
+      base: rightBase,
+      knob: rightKnob,
+      selfCentreX: true,   // roll self-centres
+      selfCentreY: true,   // pitch self-centres
+      onMove: function (nx, ny) {
+        axes.roll = clamp(applyDeadzone(nx), -1, 1);
+        axes.pitch = clamp(applyDeadzone(ny), -1, 1);
+      }
+    });
+
+    /* ---- Wire up buttons ---- */
+    armBtn.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      fire('arm');
+    }, { passive: false });
+
+    resetBtn.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      fire('reset');
+    }, { passive: false });
+
+    modeBtn.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      modeBtn.textContent = modeBtn.textContent === 'Angle' ? 'Acro' : 'Angle';
+      fire('mode');
+    }, { passive: false });
+
+    camBtn.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      fire('camera');
+    }, { passive: false });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * read() -> input object consumed by DRONE.Physics.step
+   * ------------------------------------------------------------------ */
+  function read() {
+    return {
+      throttle: axes.throttle,
+      yaw: axes.yaw,
+      pitch: axes.pitch,
+      roll: axes.roll
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * on(name, fn) — register a callback for 'arm'|'reset'|'mode'|'camera'
+   * ------------------------------------------------------------------ */
+  function on(name, fn) {
+    if (!listeners[name]) listeners[name] = [];
+    listeners[name].push(fn);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * setArmed(bool) — reflect armed state on the ARM button
+   * ------------------------------------------------------------------ */
+  function setArmed(bool) {
+    armed = !!bool;
+    var armBtn = document.querySelector('.' + CLASS_PREFIX + 'arm');
+    if (!armBtn) return;
+    if (armed) {
+      armBtn.classList.add(CLASS_PREFIX + 'armed');
+      armBtn.textContent = 'Disarm';
+    } else {
+      armBtn.classList.remove(CLASS_PREFIX + 'armed');
+      armBtn.textContent = 'Arm';
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * setThrottle(v) — move the left throttle stick to 0..1 programmatically.
+   * Used by main.js for auto-takeoff on ARM/START and to drop it on RESET.
+   * Leaves the yaw (horizontal) axis untouched.
+   * ------------------------------------------------------------------ */
+  function setThrottle(v) {
+    v = clamp(v, 0, 1);
+    axes.throttle = v;
+    if (leftStick) leftStick.setAxis(leftStick.nx, v * 2 - 1);
+  }
+
+  window.DRONE.Controls = {
+    init: init,
+    read: read,
+    on: on,
+    setArmed: setArmed,
+    setThrottle: setThrottle
+  };
+})();
+
+</script>
+<script>
+/* ===== main.js ===== */
+/* ==========================================================================
+ * main.js — boot, game loop, HUD  (integration layer)
+ * --------------------------------------------------------------------------
+ * Classic script, no modules. Load order: physics, world, render, controls,
+ * then this file. Owns:
+ *   - creating the single shared state/world objects
+ *   - the requestAnimationFrame loop (World.update -> Physics.step -> Render.draw)
+ *   - control button handlers (arm / reset / mode / camera)
+ *   - the HUD (self-injected CSS, .dhud- scoped, pointer-events:none)
+ *   - reconciling small data-shape differences between World and Render
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  var CAM_MODES = ['chase', 'orbit', 'fpv'];
+  var CAM_LABEL = { chase: '追尾', orbit: '俯瞰', fpv: 'FPV' };
+  // Throttle the sim auto-sets on ARM/START so the drone actually lifts off into a
+  // gentle climb instead of sitting on the ground at zero throttle. Hover is ~0.45,
+  // so this is just above it — the player then modulates with the left stick.
+  var TAKEOFF_THROTTLE = 0.52;
+
+  var state = null;
+  var world = null;
+  var camIdx = 0;
+  var lastT = null;
+  var gateFlashUntil = 0;
+  var shownArmed = false;
+  var hud = {}; // cached DOM refs
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  /* ------------------------------------------------------------------ *
+   * World data normalization — World produces {x,z,w,d,h} obstacles and
+   * {x,z,type,scale} landmarks; Render expects size/height/radius/color.
+   * Done ONCE at boot on the same objects (no copies — everyone keeps
+   * reading the same world).
+   * ------------------------------------------------------------------ */
+  function normalizeWorld(w) {
+    var i, o, l;
+    if (w.obstacles) {
+      for (i = 0; i < w.obstacles.length; i++) {
+        o = w.obstacles[i];
+        if (o.size || o.w == null) continue;
+        if (o.w <= 2 && o.d <= 2) {
+          // thin tall box -> render as a pole/tower
+          o.type = 'pole';
+          o.height = o.h;
+          o.radius = Math.max(o.w, o.d) / 2;
+        } else {
+          o.type = 'box';
+          o.size = { x: o.w, y: o.h, z: o.d };
+        }
+      }
+    }
+    if (w.landmarks) {
+      for (i = 0; i < w.landmarks.length; i++) {
+        l = w.landmarks[i];
+        var s = l.scale || 1;
+        if (l.type === 'tree') {
+          l.height = 4.5 * s;
+          l.color = '#2f7d3a';
+        } else if (l.type === 'pad') {
+          l.height = 0.3 * s;
+          l.color = '#e8e8e8';
+          if (l.x === 0 && l.z === 0) l.name = 'HOME';
+        }
+      }
+    }
+  }
+
+  /* Gate colors reflect course progress every frame (Render honours g.color). */
+  function updateGateColors() {
+    var gs = world.gates;
+    for (var i = 0; i < gs.length; i++) {
+      var g = gs[i];
+      g.color = g.passed ? '#4ade80' : (i === world.nextGate ? '#ffd24a' : '#f97316');
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Course / full reset
+   * ------------------------------------------------------------------ */
+  function resetCourse() {
+    world.nextGate = 0;
+    world.justPassedGate = false;
+    for (var i = 0; i < world.gates.length; i++) {
+      world.gates[i].passed = false;
+      world.gates[i]._prevAlong = undefined;
+    }
+  }
+
+  function doReset() {
+    DRONE.Physics.reset(state);   // back to spawn, disarmed (keeps mode)
+    state.battery = 100;          // integration choice: reset = fresh pack
+    resetCourse();
+    DRONE.Controls.setArmed(false);
+    if (DRONE.Controls.setThrottle) DRONE.Controls.setThrottle(0); // knob back to bottom
+    shownArmed = false;
+    gateFlashUntil = 0;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * HUD — scoped CSS injected once, DOM built once, values patched per frame
+   * ------------------------------------------------------------------ */
+  function injectHudStyle() {
+    if (document.getElementById('dhud-style')) return;
+    var css = '' +
+      '.dhud-root{position:absolute;inset:0;pointer-events:none;z-index:30;' +
+        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;' +
+        'user-select:none;-webkit-user-select:none;color:#eaf4ff;}' +
+      '.dhud-bars{position:absolute;top:calc(6px + env(safe-area-inset-top,0px));left:50%;' +
+        'transform:translateX(-50%);display:flex;flex-direction:column;gap:3px;align-items:center;}' +
+      '.dhud-row{display:flex;gap:5px;}' +
+      '.dhud-cell{background:rgba(8,14,22,0.55);border:1px solid rgba(140,200,255,0.22);' +
+        'border-radius:8px;padding:2px 8px;min-width:52px;text-align:center;' +
+        'backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);}' +
+      '.dhud-lab{display:block;font-size:8px;letter-spacing:.14em;color:rgba(170,205,255,0.65);' +
+        'text-transform:uppercase;white-space:nowrap;}' +
+      '.dhud-val{display:block;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;' +
+        'line-height:1.15;white-space:nowrap;text-shadow:0 1px 3px rgba(0,0,0,0.6);}' +
+      '.dhud-val.dhud-warn{color:#ffd24a;}' +
+      '.dhud-val.dhud-danger{color:#ff5a4a;}' +
+      /* attitude indicator */
+      '.dhud-adi{position:absolute;top:calc(70px + env(safe-area-inset-top,0px));left:50%;' +
+        'transform:translateX(-50%);width:62px;height:62px;border-radius:50%;overflow:hidden;' +
+        'border:2px solid rgba(200,230,255,0.55);box-shadow:0 2px 10px rgba(0,0,0,0.45);}' +
+      '.dhud-adi-inner{position:absolute;left:50%;top:50%;width:200%;height:200%;' +
+        'background:linear-gradient(180deg,#2f6fd1 0%,#7db2e8 49.2%,#f2f6fa 49.2%,#f2f6fa 50.8%,' +
+        '#8a6a42 50.8%,#5c4326 100%);will-change:transform;}' +
+      '.dhud-adi-ref{position:absolute;left:50%;top:50%;width:26px;height:2px;margin:-1px 0 0 -13px;' +
+        'background:#ffd24a;border-radius:1px;box-shadow:0 0 4px rgba(0,0,0,0.7);}' +
+      '.dhud-adi-dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;' +
+        'border-radius:50%;background:#ffd24a;box-shadow:0 0 4px rgba(0,0,0,0.7);}' +
+      /* banners */
+      '.dhud-banner{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);' +
+        'padding:10px 26px;border-radius:14px;font-weight:800;letter-spacing:.06em;' +
+        'text-align:center;display:none;white-space:nowrap;}' +
+      '.dhud-banner.dhud-show{display:block;}' +
+      '.dhud-gate-banner{background:rgba(30,160,80,0.85);color:#eafff2;font-size:26px;' +
+        'border:2px solid rgba(160,255,200,0.8);text-shadow:0 2px 6px rgba(0,0,0,0.4);' +
+        'animation:dhud-pop .18s ease-out;}' +
+      '.dhud-crash-banner{background:rgba(170,30,20,0.88);color:#ffecea;font-size:20px;' +
+        'border:2px solid rgba(255,160,150,0.8);animation:dhud-blink 1s step-end infinite;}' +
+      '@keyframes dhud-pop{0%{transform:translate(-50%,-50%) scale(0.6);}100%{transform:translate(-50%,-50%) scale(1);}}' +
+      '@keyframes dhud-blink{0%,100%{opacity:1;}50%{opacity:0.55;}}' +
+      '';
+    var style = document.createElement('style');
+    style.id = 'dhud-style';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function cell(labelText) {
+    var c = document.createElement('div');
+    c.className = 'dhud-cell';
+    var lab = document.createElement('span');
+    lab.className = 'dhud-lab';
+    lab.textContent = labelText;
+    var val = document.createElement('span');
+    val.className = 'dhud-val';
+    val.textContent = '—';
+    c.appendChild(lab);
+    c.appendChild(val);
+    return { el: c, val: val };
+  }
+
+  function buildHud() {
+    injectHudStyle();
+    var root = document.createElement('div');
+    root.className = 'dhud-root';
+
+    var bars = document.createElement('div');
+    bars.className = 'dhud-bars';
+
+    var row1 = document.createElement('div');
+    row1.className = 'dhud-row';
+    hud.alt  = cell('高度 m');
+    hud.spd  = cell('速度 km/h');
+    hud.vs   = cell('昇降 m/s');
+    hud.thr  = cell('出力 %');
+    hud.bat  = cell('電池 %');
+    row1.appendChild(hud.alt.el);
+    row1.appendChild(hud.spd.el);
+    row1.appendChild(hud.vs.el);
+    row1.appendChild(hud.thr.el);
+    row1.appendChild(hud.bat.el);
+
+    var row2 = document.createElement('div');
+    row2.className = 'dhud-row';
+    hud.mode = cell('モード');
+    hud.tilt = cell('傾き °');
+    hud.gate = cell('ゲート');
+    hud.lap  = cell('ラップ');
+    hud.wind = cell('風 m/s');
+    row2.appendChild(hud.mode.el);
+    row2.appendChild(hud.tilt.el);
+    row2.appendChild(hud.gate.el);
+    row2.appendChild(hud.lap.el);
+    row2.appendChild(hud.wind.el);
+
+    bars.appendChild(row1);
+    bars.appendChild(row2);
+    root.appendChild(bars);
+
+    // Attitude indicator (artificial horizon)
+    var adi = document.createElement('div');
+    adi.className = 'dhud-adi';
+    hud.adiInner = document.createElement('div');
+    hud.adiInner.className = 'dhud-adi-inner';
+    var adiRef = document.createElement('div');
+    adiRef.className = 'dhud-adi-ref';
+    var adiDot = document.createElement('div');
+    adiDot.className = 'dhud-adi-dot';
+    adi.appendChild(hud.adiInner);
+    adi.appendChild(adiRef);
+    adi.appendChild(adiDot);
+    root.appendChild(adi);
+
+    // Banners
+    hud.gateBanner = document.createElement('div');
+    hud.gateBanner.className = 'dhud-banner dhud-gate-banner';
+    hud.gateBanner.textContent = 'ゲート通過！';
+    root.appendChild(hud.gateBanner);
+
+    hud.crashBanner = document.createElement('div');
+    hud.crashBanner.className = 'dhud-banner dhud-crash-banner';
+    hud.crashBanner.textContent = 'クラッシュ！ — RESET を押してください';
+    root.appendChild(hud.crashBanner);
+
+    document.body.appendChild(root);
+  }
+
+  function setVal(c, text, cls) {
+    if (c.val.textContent !== text) c.val.textContent = text;
+    var want = 'dhud-val' + (cls ? ' ' + cls : '');
+    if (c.val.className !== want) c.val.className = want;
+  }
+
+  function updateHUD(now) {
+    setVal(hud.alt, state.altitude.toFixed(1));
+    setVal(hud.spd, (state.speed * 3.6).toFixed(0));
+    var vs = state.verticalSpeed;
+    setVal(hud.vs, (vs >= 0 ? '+' : '') + vs.toFixed(1));
+    setVal(hud.thr, String(Math.round(state.throttleCmd * 100)));
+
+    var bat = Math.max(0, Math.round(state.battery));
+    setVal(hud.bat, String(bat), bat <= 10 ? 'dhud-danger' : (bat <= 25 ? 'dhud-warn' : ''));
+
+    setVal(hud.mode, state.mode === 'acro' ? 'ACRO' : 'ANGLE',
+           state.mode === 'acro' ? 'dhud-warn' : '');
+    var tilt = Math.round(state.tiltDeg);
+    setVal(hud.tilt, String(tilt), tilt >= 45 ? 'dhud-warn' : '');
+
+    var nGates = world.gates.length;
+    var passedThisLap = (world.nextGate >= 0 && world.nextGate < nGates) ? world.nextGate : nGates;
+    setVal(hud.gate, passedThisLap + '/' + nGates);
+    setVal(hud.lap, world.lap + ' | ' + world.score + 'pt');
+
+    var wmag = Math.sqrt(world.wind.x * world.wind.x + world.wind.y * world.wind.y +
+                         world.wind.z * world.wind.z);
+    setVal(hud.wind, wmag.toFixed(1), wmag > 5 ? 'dhud-warn' : '');
+
+    // attitude indicator: roll right(+) -> horizon rotates CCW on screen;
+    // pitch nose-up(+) -> horizon slides down.
+    var rollDeg = state.euler.roll * 180 / Math.PI;
+    var pitchDeg = state.euler.pitch * 180 / Math.PI;
+    var pitchPx = clamp(pitchDeg * 0.9, -24, 24);
+    hud.adiInner.style.transform =
+      'translate(-50%,-50%) rotate(' + (-rollDeg).toFixed(1) + 'deg) translateY(' +
+      pitchPx.toFixed(1) + 'px)';
+
+    // banners
+    if (world.justPassedGate) gateFlashUntil = now + 900;
+    var showGate = now < gateFlashUntil && !state.crashed;
+    hud.gateBanner.className = 'dhud-banner dhud-gate-banner' + (showGate ? ' dhud-show' : '');
+    hud.crashBanner.className = 'dhud-banner dhud-crash-banner' + (state.crashed ? ' dhud-show' : '');
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Game loop
+   * ------------------------------------------------------------------ */
+  function frame(now) {
+    window.requestAnimationFrame(frame);
+    if (lastT == null) { lastT = now; return; }
+    var dt = (now - lastT) / 1000;
+    lastT = now;
+    if (!(dt > 0)) return;
+    if (dt > 0.05) dt = 0.05; // clamp tab-switch / hiccup spikes
+
+    var input = DRONE.Controls.read();
+    // Physics itself zeroes throttle/sticks while disarmed or crashed, so the
+    // raw input can be passed straight through.
+    DRONE.World.update(world, state, dt);
+    DRONE.Physics.step(state, input, dt, world.wind);
+
+    // Physics may disarm on its own (crash) — keep the ARM button in sync.
+    if (state.armed !== shownArmed) {
+      shownArmed = state.armed;
+      DRONE.Controls.setArmed(shownArmed);
+    }
+
+    updateGateColors();
+    DRONE.Render.draw(state, world, CAM_MODES[camIdx]);
+    updateHUD(now);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Boot
+   * ------------------------------------------------------------------ */
+  function setArmedState(on) {
+    if (state.crashed) return; // must RESET first
+    if (on && state.battery <= 0) return;
+    state.armed = !!on;
+    shownArmed = state.armed;
+    DRONE.Controls.setArmed(state.armed);
+    // Auto-takeoff: when arming from the ground with throttle near zero, nudge the
+    // throttle stick up so the drone lifts off instead of sitting there. If the
+    // player already has the throttle raised, leave their input alone.
+    if (state.armed && DRONE.Controls.setThrottle) {
+      var input = DRONE.Controls.read();
+      if (input.throttle < TAKEOFF_THROTTLE) DRONE.Controls.setThrottle(TAKEOFF_THROTTLE);
+    }
+  }
+
+  function boot() {
+    var canvas = document.getElementById('scene');
+    var controlsEl = document.getElementById('controls');
+
+    DRONE.Render.init(canvas);
+    state = DRONE.Physics.create();
+    world = DRONE.World.create();
+    normalizeWorld(world);
+    DRONE.Controls.init(controlsEl);
+
+    /* --- control handlers --- */
+    DRONE.Controls.on('arm', function () {
+      setArmedState(!state.armed);
+    });
+    DRONE.Controls.on('reset', function () {
+      doReset();
+    });
+    DRONE.Controls.on('mode', function () {
+      DRONE.Physics.setMode(state, state.mode === 'angle' ? 'acro' : 'angle');
+    });
+    DRONE.Controls.on('camera', function () {
+      camIdx = (camIdx + 1) % CAM_MODES.length;
+      var camBtn = document.querySelector('.dctl-camera');
+      if (camBtn) camBtn.textContent = CAM_LABEL[CAM_MODES[camIdx]];
+    });
+
+    /* --- HUD --- */
+    buildHud();
+
+    /* --- start overlay (markup lives in index.html) --- */
+    var startOverlay = document.getElementById('start-overlay');
+    var startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+      startBtn.addEventListener('click', function () {
+        if (startOverlay) startOverlay.style.display = 'none';
+        setArmedState(true); // START arms the drone
+      });
+    }
+
+    /* --- resize / rotate --- */
+    function onResize() {
+      DRONE.Render.resize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', function () {
+      // size settles a moment after the rotate on most phones
+      setTimeout(onResize, 250);
+    });
+    onResize();
+
+    /* --- kill pinch-zoom / double-tap zoom / pull-to-refresh --- */
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('dblclick', function (e) { e.preventDefault(); });
+    document.body.addEventListener('touchmove', function (e) {
+      if (e.target === document.body || e.target === canvas) e.preventDefault();
+    }, { passive: false });
+
+    window.requestAnimationFrame(frame);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+
+</script>
+</body>
+</html>
