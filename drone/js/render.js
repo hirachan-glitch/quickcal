@@ -123,9 +123,9 @@
   /* ------------------------------- camera ---------------------------------- */
   function buildCamera(pos, target, upHint) {
     var fwd = normalize(sub(target, pos));
-    var right = normalize(cross(fwd, upHint));
+    var right = normalize(cross(upHint, fwd));
     if (length(right) < 1e-4) right = { x: 1, y: 0, z: 0 };
-    var up = normalize(cross(right, fwd));
+    var up = normalize(cross(fwd, right));
     cam.pos.x = pos.x; cam.pos.y = pos.y; cam.pos.z = pos.z;
     cam.forward.x = fwd.x; cam.forward.y = fwd.y; cam.forward.z = fwd.z;
     cam.right.x = right.x; cam.right.y = right.y; cam.right.z = right.z;

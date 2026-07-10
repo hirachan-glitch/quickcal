@@ -166,6 +166,11 @@
         上下：前進・後退（ピッチ）<br>
         左右：左右移動（ロール）
       </div>
+      <div>
+        <b>PCキー操作</b>
+        W/S:上昇下降 A/D:旋回 矢印:前後左右<br>
+        Space:ARM R:RESET C:視点 M:モード
+      </div>
     </div>
     <p class="goal">スタートで自動的にふわっと離陸します。左スティックで高度を調整。<br>
     黄色いゲートを順番にくぐってコースを周回しよう。<br>
@@ -923,9 +928,9 @@
   /* ------------------------------- camera ---------------------------------- */
   function buildCamera(pos, target, upHint) {
     var fwd = normalize(sub(target, pos));
-    var right = normalize(cross(fwd, upHint));
+    var right = normalize(cross(upHint, fwd));
     if (length(right) < 1e-4) right = { x: 1, y: 0, z: 0 };
-    var up = normalize(cross(right, fwd));
+    var up = normalize(cross(fwd, right));
     cam.pos.x = pos.x; cam.pos.y = pos.y; cam.pos.z = pos.z;
     cam.forward.x = fwd.x; cam.forward.y = fwd.y; cam.forward.z = fwd.z;
     cam.right.x = right.x; cam.right.y = right.y; cam.right.z = right.z;
@@ -1586,7 +1591,156 @@
     roll: 0        // -1..1, self-centres
   };
 
+  /* ------------------------------------------------------------------ *
+   * Keyboard layer (PC) — mirrors the Mode-2 sticks without disturbing
+   * touch. W/S drive throttle incrementally; A/D/Arrows self-centre with
+   * a short ramp; Space/R/M/C fire the button actions.
+   * ------------------------------------------------------------------ */
+  var RAMP_RATE = 1 / 0.12;   // axis units/sec — reaches +/-1 in ~0.12s, same rate back to 0
+  var THROTTLE_RATE = 0.55;   // throttle units/sec while W/S held
+
+  var kb = {
+    w: false, s: false, a: false, d: false,
+    up: false, down: false, left: false, right: false
+  };
+  var kbYaw = 0;
+  var kbPitch = 0;
+  var kbRoll = 0;
+  var lastKbTime = null;
+  var modeBtnRef = null; // set by init(); keyboard 'M' mirrors its pointerdown handler
+
+  var KEY_AXIS_MAP = {
+    'KeyW': 'w', 'KeyS': 's', 'KeyA': 'a', 'KeyD': 'd',
+    'ArrowUp': 'up', 'ArrowDown': 'down', 'ArrowLeft': 'left', 'ArrowRight': 'right'
+  };
+
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  // Ramp `current` toward -1/0/+1 (whichever key is held) at `rate` units/sec.
+  function stepRamp(current, negHeld, posHeld, dt, rate) {
+    var target = 0;
+    if (posHeld && !negHeld) target = 1;
+    else if (negHeld && !posHeld) target = -1;
+    if (current < target) return Math.min(target, current + rate * dt);
+    if (current > target) return Math.max(target, current - rate * dt);
+    return current;
+  }
+
+  function applyKeyboard() {
+    if (!leftStick || !rightStick) return; // controls not built yet
+
+    var now = (window.performance && performance.now) ? performance.now() : Date.now();
+    if (lastKbTime === null) lastKbTime = now;
+    var dt = (now - lastKbTime) / 1000;
+    if (dt > 0.25) dt = 0.25; // clamp huge gaps (tab switch, breakpoint, etc.)
+    lastKbTime = now;
+
+    var leftFree = leftStick.pointerId === null;   // don't fight an active touch
+    var rightFree = rightStick.pointerId === null;
+
+    // Throttle: W/S, incremental & absolute. Skipped while a finger owns the left stick.
+    if (leftFree && (kb.w || kb.s)) {
+      var dThr = THROTTLE_RATE * dt;
+      var newThr = clamp(axes.throttle + (kb.w ? dThr : 0) - (kb.s ? dThr : 0), 0, 1);
+      axes.throttle = newThr;
+      leftStick.setAxis(leftStick.nx, newThr * 2 - 1);
+    }
+
+    // Yaw: A/D, self-centring ramp on the left stick's horizontal axis.
+    if (leftFree) {
+      var prevYaw = kbYaw;
+      kbYaw = stepRamp(kbYaw, kb.a, kb.d, dt, RAMP_RATE);
+      if (kb.a || kb.d || kbYaw !== prevYaw) {
+        leftStick.setAxis(kbYaw, leftStick.ny);
+      }
+    } else {
+      // A finger owns the stick. Only track its position if a yaw key is actually
+      // held (so a smooth ramp can continue once the finger lifts); otherwise stay
+      // at 0 so we don't reassert a stale value against the stick's own self-centring
+      // the instant the finger releases.
+      kbYaw = (kb.a || kb.d) ? leftStick.nx : 0;
+    }
+
+    // Pitch (Up/Down) + roll (Left/Right): self-centring ramp on the right stick.
+    if (rightFree) {
+      var prevPitch = kbPitch;
+      var prevRoll = kbRoll;
+      kbPitch = stepRamp(kbPitch, kb.down, kb.up, dt, RAMP_RATE);
+      kbRoll = stepRamp(kbRoll, kb.left, kb.right, dt, RAMP_RATE);
+      if (kb.up || kb.down || kb.left || kb.right || kbPitch !== prevPitch || kbRoll !== prevRoll) {
+        rightStick.setAxis(kbRoll, kbPitch);
+      }
+    } else {
+      // Same idea as the left stick: only shadow the touch position for an axis
+      // whose key is actually held.
+      kbPitch = (kb.up || kb.down) ? rightStick.ny : 0;
+      kbRoll = (kb.left || kb.right) ? rightStick.nx : 0;
+    }
+  }
+
+  function clearAllKeys() {
+    kb.w = kb.s = kb.a = kb.d = kb.up = kb.down = kb.left = kb.right = false;
+  }
+
+  function onKeyDown(ev) {
+    if (ev.repeat) return;
+    var code = ev.code;
+    var axisKey = KEY_AXIS_MAP[code];
+    if (axisKey) {
+      kb[axisKey] = true;
+      ev.preventDefault();
+      return;
+    }
+    switch (code) {
+      case 'Space':
+        fire('arm');
+        ev.preventDefault();
+        break;
+      case 'KeyR':
+        fire('reset');
+        ev.preventDefault();
+        break;
+      case 'KeyM':
+        if (modeBtnRef) {
+          modeBtnRef.textContent = modeBtnRef.textContent === 'Angle' ? 'Acro' : 'Angle';
+        }
+        fire('mode');
+        ev.preventDefault();
+        break;
+      case 'KeyC':
+        fire('camera');
+        ev.preventDefault();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function onKeyUp(ev) {
+    var axisKey = KEY_AXIS_MAP[ev.code];
+    if (!axisKey) return;
+    kb[axisKey] = false;
+    ev.preventDefault();
+
+    // If a finger already owns the stick and no key still drives this axis,
+    // drop our shadow value immediately (don't wait for the next frame).
+    // Otherwise a keyup landing in the same tick as the finger lifting could
+    // leave a stale ramp value that briefly fights the stick's own
+    // self-centring reset on the very next read().
+    if (axisKey === 'a' || axisKey === 'd') {
+      if (leftStick && leftStick.pointerId !== null && !kb.a && !kb.d) kbYaw = 0;
+    } else if (axisKey === 'up' || axisKey === 'down') {
+      if (rightStick && rightStick.pointerId !== null && !kb.up && !kb.down) kbPitch = 0;
+    } else if (axisKey === 'left' || axisKey === 'right') {
+      if (rightStick && rightStick.pointerId !== null && !kb.left && !kb.right) kbRoll = 0;
+    }
+  }
+
+  function installKeyboard() {
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', clearAllKeys);
+  }
 
   function applyDeadzone(v) {
     if (Math.abs(v) < DEADZONE) return 0;
@@ -1916,12 +2070,17 @@
       ev.preventDefault();
       fire('camera');
     }, { passive: false });
+
+    /* ---- Wire up keyboard (PC) — coexists with touch, never fights an active finger ---- */
+    modeBtnRef = modeBtn;
+    installKeyboard();
   }
 
   /* ------------------------------------------------------------------ *
    * read() -> input object consumed by DRONE.Physics.step
    * ------------------------------------------------------------------ */
   function read() {
+    applyKeyboard();
     return {
       throttle: axes.throttle,
       yaw: axes.yaw,
@@ -2308,6 +2467,8 @@
     DRONE.Render.init(canvas);
     state = DRONE.Physics.create();
     world = DRONE.World.create();
+    window.__DRONE_STATE = state; // debug/test hook
+    window.__DRONE_WORLD = world; // debug/test hook
     normalizeWorld(world);
     DRONE.Controls.init(controlsEl);
 

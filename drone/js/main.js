@@ -329,6 +329,8 @@
     DRONE.Render.init(canvas);
     state = DRONE.Physics.create();
     world = DRONE.World.create();
+    window.__DRONE_STATE = state; // debug/test hook
+    window.__DRONE_WORLD = world; // debug/test hook
     normalizeWorld(world);
     DRONE.Controls.init(controlsEl);
 
