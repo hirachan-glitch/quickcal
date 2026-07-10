@@ -1,0 +1,318 @@
+<title>毎日日記 — 30日ブック（印刷用）</title>
+<style>
+  :root{
+    --paper:#FAF6EE; --paper-edge:#F1EADB;
+    --ink:#26313f; --indigo:#31486e;
+    --indigo-soft:rgba(49,72,110,.16);
+    --dot:rgba(49,72,110,.20);
+    --seal:#C24A3A; --muted:#7a7261;
+    --backdrop:#E6E0D4;
+    --serif:"Hiragino Mincho ProN","Yu Mincho",YuMincho,"Noto Serif JP",serif;
+    --sans:"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",YuGothic,"Noto Sans JP",sans-serif;
+  }
+  @media (prefers-color-scheme: dark){ :root{ --backdrop:#191b1f; } }
+  :root[data-theme="dark"]{ --backdrop:#191b1f; }
+  :root[data-theme="light"]{ --backdrop:#E6E0D4; }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--backdrop);
+    font-family:var(--sans); color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+    padding:20px 12px 60px; overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ツールバー（印刷では消える） */
+  .bar{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    margin-bottom:20px; color:var(--muted); font-size:13px; text-align:center;
+  }
+  .bar b{color:var(--ink); font-weight:600}
+  .btn{
+    font-family:var(--sans); font-size:13px; cursor:pointer;
+    border:1px solid var(--indigo); color:var(--indigo); background:transparent;
+    padding:7px 14px; border-radius:999px; letter-spacing:.03em;
+  }
+  .btn:hover{background:var(--indigo); color:#fff}
+  .btn:focus-visible{outline:2px solid var(--seal); outline-offset:2px}
+
+  .stage{position:relative; margin:0 auto 16px}
+
+  .sheet{
+    width:148mm; height:210mm; background:var(--paper);
+    background-image:linear-gradient(135deg,var(--paper) 0%,var(--paper-edge) 100%);
+    box-shadow:0 10px 30px rgba(40,35,25,.22), 0 2px 6px rgba(40,35,25,.14);
+    padding:14mm 13mm 11mm; position:absolute; top:0; left:0;
+    transform-origin:top left; display:flex; flex-direction:column;
+  }
+
+  /* ============ 表紙 ============ */
+  .cover{align-items:center; text-align:center; padding-top:26mm}
+  .cover .eyebrow{
+    font-size:12px; letter-spacing:.34em; color:var(--indigo);
+    border:1px solid var(--indigo-soft); border-radius:999px;
+    padding:6px 16px;
+  }
+  .cover .vtitle{
+    writing-mode:vertical-rl; font-family:var(--serif); font-weight:600;
+    font-size:58px; letter-spacing:.24em; color:var(--ink);
+    margin:12mm 0 8mm; height:auto; line-height:1.05;
+  }
+  .cover .tag{font-family:var(--serif); font-size:16px; color:var(--muted); letter-spacing:.14em}
+  .cover .cseal{
+    width:66px; height:66px; border:2px solid var(--seal); border-radius:8px;
+    color:var(--seal); font-family:var(--serif); font-weight:700; font-size:15px;
+    display:flex; align-items:center; justify-content:center; transform:rotate(-4deg);
+    letter-spacing:.1em; margin-top:2mm;
+  }
+  .cover .owner{
+    margin-top:auto; width:100%; font-size:14px; color:var(--ink);
+    display:flex; flex-direction:column; gap:14px; align-items:center;
+  }
+  .cover .owner .row{display:flex; align-items:baseline; gap:8px}
+  .cover .owner .lbl{color:var(--muted); font-size:12.5px; letter-spacing:.1em}
+  .cover .owner .u{display:inline-block; border-bottom:1px solid var(--indigo-soft); min-width:150px}
+  .cover .owner .u.sm{min-width:42px}
+
+  /* ============ 共通・本文セクション ============ */
+  .kicker{font-size:11px; letter-spacing:.24em; color:var(--indigo); margin:0}
+  .h{font-family:var(--serif); font-size:24px; font-weight:600; letter-spacing:.1em; margin:6px 0 0}
+  .lead{font-size:13px; color:var(--muted); margin-top:8px; letter-spacing:.03em}
+  hr.rule{border:none; border-top:1px solid var(--indigo-soft); margin:14px 0}
+
+  /* 使い方 */
+  .steps{display:flex; flex-direction:column; gap:14px; margin-top:6px}
+  .step{display:flex; gap:14px; align-items:flex-start}
+  .step .num{
+    flex:none; width:34px; height:34px; border-radius:50%;
+    background:var(--indigo); color:#fdfbf6; font-family:var(--serif);
+    font-size:17px; display:flex; align-items:center; justify-content:center;
+  }
+  .step .t{font-size:15px; font-weight:600; color:var(--ink)}
+  .step .d{font-size:12.5px; color:#59606c; line-height:1.6; margin-top:3px}
+  .reply{
+    margin-top:4px; background:rgba(49,72,110,.06); border-radius:8px;
+    padding:10px 12px; font-size:12px; color:#4a5361; line-height:1.6;
+  }
+  .reply b{color:var(--seal)}
+  .notes{margin-top:16px; font-size:12px; color:#59606c; line-height:1.9}
+  .notes .k{color:var(--indigo); margin-right:6px}
+
+  /* 目次トラッカー */
+  .grid{
+    margin-top:12px; flex:1;
+    display:grid; grid-template-columns:repeat(5,1fr); grid-auto-rows:1fr; gap:8px;
+  }
+  .cell{
+    border:1px solid var(--indigo-soft); border-radius:7px; padding:7px 8px;
+    display:flex; flex-direction:column; gap:5px; position:relative;
+  }
+  .cell .dn{font-family:var(--serif); font-size:15px; color:var(--indigo); font-weight:700}
+  .cell .dt{font-size:10px; color:var(--muted); letter-spacing:.04em}
+  .cell .ck{
+    position:absolute; right:7px; top:7px; width:13px; height:13px;
+    border:1px solid var(--indigo-soft); border-radius:50%;
+  }
+
+  /* 月イチふりかえり */
+  .mfield{
+    flex:1; margin-top:12px; border-radius:2px;
+    background-image:radial-gradient(var(--dot) 1.1px, transparent 1.2px);
+    background-size:6.2mm 6.2mm; background-position:2mm 4mm;
+  }
+
+  /* ============ 毎日ページ ============ */
+  .head{display:flex; justify-content:space-between; align-items:flex-start}
+  .title{font-family:var(--serif); font-size:25px; font-weight:600; letter-spacing:.14em; margin:0}
+  .subtitle{font-size:10.5px; letter-spacing:.18em; color:var(--muted); margin-top:5px}
+  .seal{
+    flex:none; width:52px; height:52px; border:1.6px solid var(--seal); border-radius:5px;
+    color:var(--seal); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    line-height:1; transform:rotate(-3deg);
+  }
+  .seal .n{font-family:var(--serif); font-size:22px; font-weight:700}
+  .seal .d{font-size:8.5px; letter-spacing:.24em; margin-top:3px}
+  .date{margin-top:16px; display:flex; align-items:baseline; gap:6px; font-size:14px; letter-spacing:.04em}
+  .date .u{display:inline-block; border-bottom:1px solid var(--indigo-soft); min-width:44px; text-align:center; padding-bottom:2px}
+  .date .u.sm{min-width:30px}
+  .date .lbl{color:var(--muted); font-size:13px}
+  .field{
+    flex:1 1 auto; margin-top:14px; border-radius:2px;
+    background-image:radial-gradient(var(--dot) 1.1px, transparent 1.2px);
+    background-size:6.2mm 6.2mm; background-position:2mm 3mm; position:relative;
+  }
+  .field .hint{position:absolute; top:10px; left:12px; font-size:11px; color:var(--muted); letter-spacing:.06em}
+  .ai{margin-top:12px; border:1px solid var(--indigo-soft); border-radius:6px; overflow:hidden}
+  .ai-h{background:var(--indigo); color:#fdfbf6; font-size:11px; letter-spacing:.1em; padding:5px 12px; display:flex; align-items:center; gap:7px}
+  .ai-b{padding:9px 13px 11px; font-size:10.7px; line-height:1.62; color:#3a4453}
+  .ai-b .l{color:var(--ink)}
+  .items{display:grid; grid-template-columns:1fr 1fr; gap:2px 18px; margin:6px 0 5px; padding:0; list-style:none}
+  .items li{position:relative; padding-left:14px}
+  .items li::before{content:"◆"; position:absolute; left:0; top:.05em; color:var(--seal); font-size:8px}
+  .items b{color:var(--ink); font-weight:600}
+  .items span{color:#6b7484}
+  .ai-b .foot{color:var(--muted)}
+
+  @media print{
+    @page{ size:A5; margin:0 }
+    body{background:#fff; padding:0; overflow:visible}
+    .bar{display:none}
+    .stage{width:auto !important; height:auto !important; margin:0 !important; break-after:page}
+    .stage:last-child{break-after:auto}
+    .sheet{box-shadow:none; position:static !important; transform:none !important}
+  }
+</style>
+
+<div class="bar no-print">
+  <b>毎日日記 — 30日ブック</b>
+  <span>A5・全34ページ。「印刷 / PDFで保存」→ 用紙A5・余白なしで。</span>
+  <button class="btn" onclick="window.print()">印刷 / PDFで保存</button>
+</div>
+
+<div id="book">
+
+  <!-- 表紙 -->
+  <div class="stage"><div class="sheet cover">
+    <div class="eyebrow">書いて、撮って、AIとふりかえる</div>
+    <div class="vtitle">毎日日記</div>
+    <div class="tag">まいにち、そっと。　30日</div>
+    <div class="cseal">日記</div>
+    <div class="owner">
+      <div class="row"><span class="lbl">もちぬし</span><span class="u"></span></div>
+      <div class="row"><span class="lbl">はじめた日</span>
+        <span class="u sm"></span><span class="lbl">年</span>
+        <span class="u sm" style="min-width:30px"></span><span class="lbl">月</span>
+        <span class="u sm" style="min-width:30px"></span><span class="lbl">日</span>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- 使い方 -->
+  <div class="stage"><div class="sheet">
+    <p class="kicker">HOW TO USE</p>
+    <h2 class="h">この日記の使い方</h2>
+    <p class="lead">書いて、撮って、AIとふりかえる。それだけです。</p>
+    <hr class="rule">
+    <div class="steps">
+      <div class="step"><div class="num">1</div><div>
+        <div class="t">書く</div>
+        <div class="d">きょうのことを、すきなだけ。うまく書けなくて大丈夫です。</div>
+      </div></div>
+      <div class="step"><div class="num">2</div><div>
+        <div class="t">撮る</div>
+        <div class="d">書けたら、ページを1枚、写真に撮ります。</div>
+      </div></div>
+      <div class="step"><div class="num">3</div><div>
+        <div class="t">送る</div>
+        <div class="d">お使いのAIアプリ（ChatGPT・Geminiなど）に、その写真を送るだけ。</div>
+        <div class="reply">AIが、<b>直さず・点をつけず</b>、そっと4つのことばを返してくれます。<br>
+          きょうの要点 ／ 心の動き ／ 残したい一言 ／ あしたへのひとこと</div>
+      </div></div>
+    </div>
+    <div class="notes">
+      <div><span class="k">・</span>名前や、人に見せたくないことは、書かなくて大丈夫。</div>
+      <div><span class="k">・</span>AIがうまく動かない時は「この写真の指示どおりにしてね」と一言そえて。</div>
+      <div><span class="k">・</span>毎日でなくていい。書きたい日に、ひとつずつ。</div>
+    </div>
+  </div></div>
+
+  <!-- 目次・30日トラッカー -->
+  <div class="stage"><div class="sheet">
+    <p class="kicker">CONTENTS &nbsp;/&nbsp; 30 DAYS</p>
+    <h2 class="h">30日の記録</h2>
+    <p class="lead">書けた日は、右上の〇をぬりましょう。</p>
+    <div class="grid" id="tracker"></div>
+  </div></div>
+
+  <!-- 月イチふりかえり -->
+  <div class="stage"><div class="sheet">
+    <p class="kicker">MONTHLY</p>
+    <h2 class="h">ひと月のふりかえり</h2>
+    <p class="lead">1か月書いたら、このページと、心に残った数日分を一緒に写真に撮ってAIへ。</p>
+    <div class="ai" style="margin-top:12px">
+      <div class="ai-h">📷　このページ＋数日分を撮って、AIに送ってください</div>
+      <div class="ai-b">
+        <span class="l">AIへ：この1か月ぶんの日記です。直したり点数をつけたりしないで。</span>
+        <ul class="items" style="grid-template-columns:1fr">
+          <li><b>大切にしていたこと</b> <span>ひと月をとおして、この人が大事にしていたもの</span></li>
+          <li><b>気持ちの流れ</b> <span>1か月でどう心が動いたか、そっと</span></li>
+          <li><b>来月への小さな問い</b> <span>持っていけそうな問いを、ひとつだけ</span></li>
+        </ul>
+        <span class="foot">となりに座っている人のつもりで、静かに。</span>
+      </div>
+    </div>
+    <div style="margin-top:12px; font-size:12px; color:var(--muted)">この1か月で、いちばん心に残っていること</div>
+    <div class="mfield"></div>
+  </div></div>
+
+  <!-- 毎日ページ ×30 -->
+  <div id="days"></div>
+</div>
+
+<script>
+  // 30日トラッカー
+  var tk='';
+  for(var d=1; d<=30; d++){
+    tk+='<div class="cell"><span class="ck"></span>'+
+        '<span class="dn">'+d+'</span>'+
+        '<span class="dt">＿月＿日</span></div>';
+  }
+  document.getElementById('tracker').innerHTML=tk;
+
+  // 毎日ページ
+  function dayPage(n){
+    return '<div class="stage"><div class="sheet">'+
+      '<div class="head"><div>'+
+        '<h1 class="title">きょうの日記</h1>'+
+        '<div class="subtitle">FREE DIARY　·　おもうまま、すきなだけ</div>'+
+      '</div>'+
+      '<div class="seal" aria-label="'+n+'日目"><span class="n">'+n+'</span><span class="d">DAY</span></div>'+
+      '</div>'+
+      '<div class="date">'+
+        '<span class="u">　　</span><span class="lbl">年</span>'+
+        '<span class="u sm">　</span><span class="lbl">月</span>'+
+        '<span class="u sm">　</span><span class="lbl">日</span>'+
+        '<span class="lbl">（　　）</span>'+
+        '<span class="lbl" style="margin-left:auto">きょうの天気　　　　</span>'+
+      '</div>'+
+      '<div class="field"><span class="hint">──　なんでも、おもったことを　──</span></div>'+
+      '<div class="ai">'+
+        '<div class="ai-h">📷　このページを撮って、AIに送ってください</div>'+
+        '<div class="ai-b">'+
+          '<span class="l">AIへ：このページの写真だけを見て。自由に書いた日記です。誤字も文章のうまさも直さず、良い悪いの点もつけないで。</span>'+
+          '下の4つを、この順・見出しごとに返してください。前置き・意図の詮索・締めの挨拶や、名前での呼びかけはいりません。'+
+          '<ul class="items">'+
+            '<li><b>きょうの要点</b> <span>どんな一日だったかを短く</span></li>'+
+            '<li><b>心の動き</b> <span>気づいた気持ちを、決めつけずそっと</span></li>'+
+            '<li><b>残したい一言</b> <span>書いた言葉から、そのまま一つ</span></li>'+
+            '<li><b>あしたへのひとこと</b> <span>そっと一言だけ</span></li>'+
+          '</ul>'+
+          '<span class="foot">となりに座っている人のつもりで、静かに。直すのではなく、いっしょに見てください。</span>'+
+        '</div>'+
+      '</div>'+
+    '</div></div>';
+  }
+  var dd='';
+  for(var i=1; i<=30; i++){ dd+=dayPage(i); }
+  document.getElementById('days').innerHTML=dd;
+
+  // スマホ幅に各ページをフィット
+  function fitAll(){
+    var stages=document.querySelectorAll('.stage');
+    var avail=Math.min(window.innerWidth-24, 560);
+    for(var i=0;i<stages.length;i++){
+      var sheet=stages[i].querySelector('.sheet');
+      sheet.style.transform='none';
+      var w=sheet.offsetWidth, h=sheet.offsetHeight;
+      var s=avail/w; if(s>1) s=1;
+      sheet.style.transform='scale('+s+')';
+      stages[i].style.width=(w*s)+'px';
+      stages[i].style.height=(h*s)+'px';
+    }
+  }
+  window.addEventListener('resize',fitAll);
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',fitAll);
+  window.addEventListener('load',fitAll);
+  fitAll();
+</script>
