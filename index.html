@@ -197,7 +197,19 @@
     padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap;
   }
   .memo-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-  .memo-dest { font-size: 11px; color: var(--text-dim); }
+  .memo-dest {
+    font-size: 11px; color: var(--text-dim); cursor: pointer;
+    text-decoration: underline dotted rgba(139,147,167,.55); text-underline-offset: 3px;
+  }
+  .memo-dest:hover { color: var(--accent2); }
+  .edit-bar {
+    margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    font-size: 12px; font-weight: 700; color: #fbbf24; line-height: 1.5;
+    background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35);
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .edit-bar a { color: #fca5a5; text-decoration: none; font-weight: 800; white-space: nowrap; }
+  .edit-bar a:hover { text-decoration: underline; }
   .memo-foot a { font-size: 12px; font-weight: 700; color: var(--accent3); text-decoration: none; }
   .memo-foot a:hover { text-decoration: underline; }
   .m-time { color: var(--accent3); }
@@ -215,13 +227,15 @@
   .h-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--grad); flex-shrink: 0; }
   .h-body { flex: 1; min-width: 0; }
   .h-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h-title.expandable { cursor: pointer; }
+  .h-title.open { white-space: pre-wrap; overflow: visible; text-overflow: clip; word-break: break-word; }
   .h-when { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
-  .h-item a, .h-item button.del {
+  .h-item a, .h-item button.del, .h-item button.act {
     font-family: inherit; flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
     display: grid; place-items: center; text-decoration: none; font-size: 14px;
     color: var(--text-dim); background: rgba(255,255,255,.06); border: none; cursor: pointer; transition: .15s;
   }
-  .h-item a:hover { color: var(--accent2); background: rgba(34,211,238,.15); }
+  .h-item a:hover, .h-item button.act:hover { color: var(--accent2); background: rgba(34,211,238,.15); }
   .h-item button.del:hover { color: #f87171; background: rgba(248,113,113,.15); }
   .h-empty { font-size: 13px; color: var(--text-dim); padding: 18px 6px; text-align: center; line-height: 1.7; }
 
@@ -428,13 +442,17 @@
       <div class="card memo">
         <h2>✦ クイックメモ → Obsidian</h2>
         <textarea id="memoText" placeholder="思いついたことをサッとメモ…&#10;保存は一瞬（アプリ内）。Obsidianへはあとでまとめて送れます"></textarea>
+        <div class="edit-bar" id="editBar" hidden>
+          <span>✏️ 保存済みメモを編集中 —「上書き保存」で更新されます</span>
+          <a href="#" id="editCancel">✕ やめる</a>
+        </div>
         <div class="memo-btn-row">
           <button id="memoSave" class="submit memo-btn">📝 保存</button>
           <button id="memoNow" class="submit memo-btn now-btn">⚡ 今すぐ送る</button>
         </div>
         <button id="memoFlush" class="submit memo-btn flush-btn" hidden>📤 Obsidianへまとめて送る</button>
         <div class="memo-foot">
-          <span class="memo-dest" id="memoDest"></span>
+          <span class="memo-dest" id="memoDest" title="タップでObsidianの保管庫（Vault）名を変更"></span>
           <a href="#" id="memoOpen">📓 今日のメモを開く</a>
         </div>
         <div class="h-list" id="mList" style="margin-top:14px"></div>
@@ -630,6 +648,7 @@
   function buildUrl() {
     const title = $('title').value.trim();
     const dv = $('date').value;
+    if (!dv) return null; // 日付が空だと Invalid Date になるため
     let dates;
     if ($('allday').checked) {
       const d = new Date(dv + 'T00:00:00');
@@ -703,7 +722,7 @@
       return;
     }
     const url = buildUrl();
-    if (!url) { toast('時間を設定してください'); return; }
+    if (!url) { toast('日付と時間を設定してください'); return; }
     const d = new Date($('date').value + 'T00:00:00');
     const when = `${d.getMonth()+1}/${d.getDate()}(${WDAYS[d.getDay()]}) ` +
       ($('allday').checked ? '終日' : `${$('start').value}〜${$('end').value}`);
@@ -715,14 +734,27 @@
   });
 
   /* ---------- クイックメモ → Obsidian ---------- */
-  const VAULT = 'Hirachan';
   const MKEY = 'quickcal_memos';
+  const VKEY = 'quickcal_vault';
+  const getVault = () => localStorage.getItem(VKEY) || 'Hirachan';
   const memoFileFor = day => `90_Memo/${day} メモ`;
   const todayMemoFile = () => memoFileFor(toDateStr(new Date()));
-  $('memoDest').textContent = `保存先: ${todayMemoFile()}.md`;
+
+  function renderMemoDest(day = toDateStr(new Date())) {
+    $('memoDest').textContent = `保存先: ${getVault()} / ${memoFileFor(day)}.md`;
+  }
+  // 保管庫（Vault）名を端末ごとに変更できる（名前違いで黙って失敗するのを防ぐ）
+  $('memoDest').addEventListener('click', () => {
+    const v = prompt('Obsidianの保管庫（Vault）名を入力してください', getVault());
+    if (v == null) return;
+    const name = v.trim();
+    if (name) localStorage.setItem(VKEY, name); else localStorage.removeItem(VKEY);
+    renderMemoDest();
+    toast(`保管庫を「${getVault()}」にしました`);
+  });
 
   function memoUriFor(content) {
-    return 'obsidian://new?vault=' + encodeURIComponent(VAULT)
+    return 'obsidian://new?vault=' + encodeURIComponent(getVault())
       + '&file=' + encodeURIComponent(todayMemoFile())
       + '&content=' + encodeURIComponent(content)
       + '&append=true';
@@ -741,22 +773,85 @@
     localStorage.setItem(MKEY, JSON.stringify(merged));
   };
 
+  // tsは各メモの識別子として使うため、必ず一意にする（旧データには起動時に付与）
+  const uniqueTs = arr => { let t = Date.now(); while (arr.some(x => x.ts === t)) t++; return t; };
+  (function migrateMemoTs() {
+    const list = loadMemos();
+    const nums = list.map(x => x.ts).filter(t => typeof t === 'number');
+    let base = (nums.length ? Math.min(...nums) : Date.now()) - 1;
+    let changed = false;
+    for (const x of list) if (x.ts == null) { x.ts = base--; changed = true; }
+    if (changed) saveMemos(list);
+  })();
+
+  function memoLine(p, todayStr) {
+    const d = new Date(p.ts);
+    const stamp = toDateStr(d) === todayStr
+      ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      : `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `\n- **${stamp}** ${String(p.text).replace(/\n/g, '\n  ')}`;
+  }
+
+  // obsidian:// を開けたか見届ける仕組み:
+  // URLを開いてもこのページが前面のまま（フォーカスも表示も失わない）なら
+  // Obsidianを起動できなかったと判断し、該当メモを「未送信」に戻して知らせる。
+  // （従来は開けなくても送信済み扱いになり、メモがObsidianに届かないままだった）
+  let uriWatchTimer = null, uriWatchCleanup = null;
+  function fireObsidianUri(uri, tsSet) {
+    if (uriWatchTimer) { clearTimeout(uriWatchTimer); uriWatchTimer = null; }
+    if (uriWatchCleanup) uriWatchCleanup();
+    let left = false;
+    const onLeave = () => { left = true; cleanup(); };
+    const onVis = () => { if (document.visibilityState === 'hidden') onLeave(); };
+    const cleanup = () => {
+      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', onVis);
+      uriWatchCleanup = null;
+    };
+    uriWatchCleanup = cleanup;
+    window.addEventListener('blur', onLeave);
+    document.addEventListener('visibilitychange', onVis);
+    location.href = uri;
+    uriWatchTimer = setTimeout(() => {
+      uriWatchTimer = null; cleanup();
+      if (left || !tsSet || !tsSet.size) return;
+      const list = loadMemos();
+      if (!list.some(x => tsSet.has(x.ts) && x.sent)) return;
+      saveMemos(list.map(x => tsSet.has(x.ts) ? { ...x, sent: false } : x));
+      renderMemos();
+      toast('Obsidianを開けなかったようです。メモは「未送信」のまま残しています');
+    }, 2500);
+  }
+
+  /* --- 保存済みメモの編集 --- */
+  let editingTs = null;
+  function setEditBar() {
+    $('editBar').hidden = editingTs == null;
+    $('memoSave').textContent = editingTs == null ? '📝 保存' : '✅ 上書き保存';
+  }
+  function cancelEdit() { editingTs = null; setEditBar(); }
+  $('editCancel').addEventListener('click', e => { e.preventDefault(); cancelEdit(); });
+
   function renderMemos() {
     const list = loadMemos();
+    if (editingTs != null && !list.some(x => x.ts === editingTs)) cancelEdit();
     const el = $('mList');
-    if (!list.length) { el.innerHTML = ''; return; }
     el.innerHTML = '';
-    list.forEach((it, i) => {
+    list.forEach(it => {
       const div = document.createElement('div');
       div.className = 'h-item';
       div.innerHTML = `
         <div class="h-dot" style="background:linear-gradient(135deg,#a855f7,#6366f1)"></div>
         <div class="h-body">
-          <div class="h-title"></div>
+          <div class="h-title expandable" title="タップで全文を表示"></div>
           <div class="h-when m-time"></div>
         </div>
-        <button class="del" title="履歴から削除">✕</button>`;
-      div.querySelector('.h-title').textContent = it.text;
+        <button class="act edit" title="メモ欄に呼び出して編集">✎</button>
+        <button class="act send" title="このメモだけObsidianへ送る">📤</button>
+        <button class="del" title="削除">✕</button>`;
+      const titleEl = div.querySelector('.h-title');
+      titleEl.textContent = it.text;
+      titleEl.addEventListener('click', () => titleEl.classList.toggle('open'));
       div.querySelector('.h-when').textContent = it.when;
       if (!it.sent) {
         const chip = document.createElement('span');
@@ -764,8 +859,30 @@
         chip.textContent = '未送信';
         div.querySelector('.h-when').appendChild(chip);
       }
+      div.querySelector('.edit').addEventListener('click', () => {
+        editingTs = it.ts;
+        $('memoText').value = it.text;
+        setEditBar();
+        $('memoText').focus();
+      });
+      div.querySelector('.send').addEventListener('click', () => {
+        const arr = loadMemos();
+        const k = arr.findIndex(x => x.ts === it.ts);
+        if (k < 0) return;
+        const line = memoLine(arr[k], toDateStr(new Date()));
+        saveMemos(arr.map((x, j) => j === k ? { ...x, sent: true } : x));
+        renderMemos();
+        toast('このメモをObsidianへ送りました');
+        fireObsidianUri(memoUriFor(line), new Set([it.ts]));
+      });
       div.querySelector('.del').addEventListener('click', () => {
-        const arr = loadMemos(); arr.splice(i, 1); saveMemos(arr); renderMemos();
+        if (!it.sent && !confirm('このメモはまだObsidianへ送っていません。削除しますか？')) return;
+        const arr = loadMemos();
+        const k = arr.findIndex(x => x.ts === it.ts);
+        if (k < 0) return;
+        arr.splice(k, 1);
+        if (it.ts === editingTs) cancelEdit();
+        saveMemos(arr); renderMemos();
       });
       el.appendChild(div);
     });
@@ -786,31 +903,53 @@
     return text;
   }
 
-  function addMemoEntry(text, sent) {
+  function addMemoEntry(text) {
     const d = new Date();
     const m = loadMemos();
-    m.unshift({ text, when: `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: Date.now(), sent });
+    m.unshift({ text, when: `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`, ts: uniqueTs(m), sent: false });
     saveMemos(m); renderMemos();
     $('memoText').value = '';
   }
 
+  // 入力欄の内容を確定する（新規保存 or 編集中メモの上書き）。成功時 'added'/'edited'
+  function commitMemoFromBox() {
+    const text = requireMemoText();
+    if (!text) return null;
+    if (editingTs != null) {
+      const m = loadMemos();
+      const it = m.find(x => x.ts === editingTs);
+      cancelEdit();
+      if (it) {
+        it.text = text;
+        it.sent = false; // 内容が変わったので再送対象に戻す
+        saveMemos(m);
+        $('memoText').value = '';
+        renderMemos();
+        return 'edited';
+      }
+    }
+    addMemoEntry(text);
+    return 'added';
+  }
+
   // 📝 保存: アプリ内に一瞬で保存（あとでまとめてObsidianへ）
   $('memoSave').addEventListener('click', () => {
-    const text = requireMemoText();
-    if (!text) return;
-    addMemoEntry(text, false);
+    const r = commitMemoFromBox();
+    if (!r) return;
     $('memoText').focus();
-    toast('アプリに保存しました（あとでまとめてObsidianへ）');
+    toast(r === 'edited' ? '上書き保存しました（未送信に戻しました）' : 'アプリに保存しました（あとでまとめてObsidianへ）');
   });
 
-  // ⚡ 今すぐ送る: 従来方式。このメモだけ即Obsidianに追記
+  // Ctrl/Cmd + Enter でも保存できる
+  $('memoText').addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('memoSave').click(); }
+  });
+
+  // ⚡ 今すぐ送る: 保存してから未送信ぶんをまとめて即送信
+  // （アプリ内保存を経由するので、Obsidianを開けなくてもメモは失われない）
   $('memoNow').addEventListener('click', () => {
-    const text = requireMemoText();
-    if (!text) return;
-    const d = new Date();
-    addMemoEntry(text, true);
-    location.href = memoUriFor(`\n- **${pad(d.getHours())}:${pad(d.getMinutes())}** ${text.replace(/\n/g, '\n  ')}`);
-    toast('Obsidianの今日のメモに追記しました');
+    if (!commitMemoFromBox()) return;
+    flushMemos();
   });
 
   // 未送信メモを1回のObsidian呼び出しでまとめて追記する
@@ -822,11 +961,7 @@
     const lines = [];
     let used = 0, count = 0;
     for (const p of pending) {
-      const d = new Date(p.ts);
-      const stamp = toDateStr(d) === todayStr
-        ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
-        : `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      const line = `\n- **${stamp}** ${p.text.replace(/\n/g, '\n  ')}`;
+      const line = memoLine(p, todayStr);
       if (used + line.length > 4000 && count > 0) break; // URLが長すぎる時は分割（残りは次回）
       lines.push(line); used += line.length; count++;
     }
@@ -835,19 +970,20 @@
       const sentSet = new Set(pending.slice(0, count).map(p => p.ts));
       saveMemos(list.map(x => sentSet.has(x.ts) ? { ...x, sent: true } : x));
       renderMemos();
-      location.href = uri;
       const remain = pending.length - count;
       toast(remain > 0 ? `${count}件送りました。残り${remain}件はもう一度押してください` : `${count}件をObsidianに送りました`);
+      fireObsidianUri(uri, sentSet);
     }
     return uri;
   }
   $('memoFlush').addEventListener('click', () => flushMemos());
 
+  // 今日のメモを開く（未作成でもエラーにならないよう、空追記のnew URLで開く）
   $('memoOpen').addEventListener('click', e => {
     e.preventDefault();
-    location.href = 'obsidian://open?vault=' + encodeURIComponent(VAULT)
-      + '&file=' + encodeURIComponent(todayMemoFile());
+    location.href = memoUriFor('');
   });
+  renderMemoDest();
 
   /* ---------- Googleカレンダー連携（読み取り専用） ---------- */
   const CIDKEY = 'quickcal_client_id', SEENKEY = 'quickcal_seen', GRANTED = 'quickcal_granted';
@@ -1119,7 +1255,7 @@
   function checkDateRollover(nowDay = toDateStr(new Date())) {
     if (nowDay === lastToday) return;
     if ($('date').value === lastToday) { $('date').value = nowDay; renderPreview(); }
-    $('memoDest').textContent = `保存先: ${memoFileFor(nowDay)}.md`;
+    renderMemoDest(nowDay);
     lastToday = nowDay;
   }
   setInterval(() => checkDateRollover(), 30 * 1000);
@@ -1128,6 +1264,7 @@
   window.__qc = {
     checkDateRollover,
     _flushUri: () => flushMemos(false),
+    _memos: () => loadMemos(),
     _setEvents(evts) { allEvents = evts; lastLoad = Date.now(); renderAgenda(); checkConflict(); },
   };
 
