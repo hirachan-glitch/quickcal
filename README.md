@@ -12,3 +12,7 @@
 
 https://hirachan-glitch.github.io/quickcal/ を開くだけ。
 予定確認機能はGoogle CloudでOAuthクライアントIDを作成し、アプリ内の⚙から設定（アプリ内に手順あり）。
+
+## QR便利帳シリーズ
+
+- [スマホの便利帳 ゲーム編](https://hirachan-glitch.github.io/quickcal/benricho-game.html) — スマホで遊べる有名ゲーム30選。各ゲームのQRコードと遊び方をシニア向けに解説（`benricho-game.html`）。
