@@ -107,7 +107,7 @@ COVER = """
     <div class="vol">ゲーム編</div>
     <div class="emoji">🎮🧩🐈🎴</div>
     <p class="lead">スマホで遊べる有名ゲーム 30選<br>QRコードをかざすだけで、すぐはじめられます</p>
-    <div class="pub">2026年7月 発行</div>
+    <div class="pub">ひらちゃんのAI＆デジタル生活サポート<br>2026年7月 発行</div>
   </section>"""
 
 HOWTO = """
@@ -167,8 +167,8 @@ COLOPHON = """
       <h2>QR便利帳シリーズ<br>スマホの便利帳　ゲーム編</h2>
       <table>
         <tr><td>発行日</td><td>2026年7月　初版</td></tr>
-        <tr><td>発行者</td><td>　　　　　　　　　　　　　　</td></tr>
-        <tr><td>連絡先</td><td>　　　　　　　　　　　　　　</td></tr>
+        <tr><td>発行</td><td>ひらちゃんのAI＆デジタル生活サポート</td></tr>
+        <tr><td>発行者</td><td>平岩 篤史</td></tr>
       </table>
       <div class="c-note">
         <p>本書の内容の無断転載を禁じます。</p>
@@ -342,7 +342,8 @@ from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
     b = p.chromium.launch(executable_path="/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
     pg = b.new_page()
-    pg.goto(f"file://{OUT_HTML}")
+    import os
+    pg.goto(f"file://{os.path.abspath(OUT_HTML)}")
     pg.pdf(
         path=OUT_PDF,
         width="148mm",
