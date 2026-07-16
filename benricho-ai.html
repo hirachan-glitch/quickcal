@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI便利帳 スマホの便利帳 AIプロンプト集</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN",
+                 "BIZ UDGothic", "Yu Gothic", "Meiryo", sans-serif;
+    background: #eef0f8;
+    color: #222;
+    font-size: 18px;
+    line-height: 1.75;
+  }
+  .page {
+    max-width: 860px;
+    margin: 24px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    padding: 36px 40px;
+  }
+
+  /* ---------- 表紙 ---------- */
+  .cover {
+    text-align: center;
+    padding: 70px 40px;
+    background: linear-gradient(160deg, #f8f8ff 0%, #e7eafb 100%);
+    border: 3px solid #5c6bc0;
+  }
+  .cover .series {
+    display: inline-block;
+    background: #5c6bc0;
+    color: #fff;
+    font-weight: bold;
+    padding: 6px 26px;
+    border-radius: 999px;
+    font-size: 20px;
+    letter-spacing: .2em;
+  }
+  .cover h1 { font-size: 46px; margin: 28px 0 6px; letter-spacing: .06em; }
+  .cover .vol { font-size: 30px; color: #4527a0; font-weight: bold; letter-spacing: .1em; }
+  .cover .emoji { font-size: 72px; margin: 26px 0 10px; letter-spacing: .08em; }
+  .cover .lead { font-size: 21px; margin-top: 16px; }
+  .cover .pub { margin-top: 44px; color: #6b6f8f; font-size: 15px; }
+
+  /* ---------- 使い方・共通 ---------- */
+  h2.sec { font-size: 30px; border-left: 12px solid #5c6bc0; padding-left: 14px; margin-bottom: 22px; }
+  .howto ol { list-style: none; }
+  .howto li { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; font-size: 20px; }
+  .bignum {
+    flex: none; width: 44px; height: 44px; border-radius: 50%;
+    background: #5c6bc0; color: #fff; font-weight: bold; font-size: 24px;
+    display: flex; align-items: center; justify-content: center; margin-top: 2px;
+  }
+  .promise { background: #eef1fb; border: 2px solid #5c6bc0; border-radius: 12px; padding: 20px 24px; margin-top: 28px; }
+  .promise h3 { font-size: 22px; color: #4527a0; margin-bottom: 10px; }
+  .promise li { margin-left: 1.4em; margin-bottom: 8px; }
+
+  /* ---------- アプリ準備（QR） ---------- */
+  .apps { display: flex; gap: 20px; margin: 18px 0 26px; }
+  .app-card {
+    flex: 1; text-align: center;
+    background: #fafafa; border: 2px solid #dcdff0; border-radius: 14px; padding: 18px 14px;
+  }
+  .qr { width: 170px; height: 170px; }
+  .app-name { font-weight: bold; font-size: 20px; margin-bottom: 8px; }
+  .qr-url { color: #888; font-size: 13px; word-break: break-all; }
+  .app-note { font-size: 15px; color: #555; margin-top: 8px; line-height: 1.6; text-align: left; }
+
+  /* ---------- 目次 ---------- */
+  .toc-cat {
+    margin: 22px 0 8px; padding: 8px 16px; border-radius: 8px;
+    background: var(--bg); color: var(--c);
+    font-weight: bold; font-size: 21px;
+  }
+  .toc-row {
+    display: flex; gap: 14px; padding: 7px 16px; text-decoration: none; color: #222;
+    border-bottom: 1px dashed #ddd; font-size: 19px;
+  }
+  .toc-row:hover { background: #f2f4fc; }
+  .toc-no { font-weight: bold; color: #999; }
+
+  /* ---------- プロンプトページ ---------- */
+  .pr { border-top: 10px solid var(--c); }
+  .pr-head { display: flex; justify-content: space-between; align-items: center; }
+  .pr-cat {
+    background: var(--bg); color: var(--c); font-weight: bold;
+    padding: 4px 16px; border-radius: 999px; font-size: 16px;
+  }
+  .pr-no { font-size: 30px; font-weight: bold; color: var(--c); }
+  .pr-no span { font-size: 16px; color: #aaa; }
+  .pr-name { font-size: 34px; margin-top: 14px; line-height: 1.3; margin-bottom: 6px; }
+  .pr-what { color: #555; font-size: 18px; margin-bottom: 18px; }
+
+  /* 写して使うプロンプトの枠 */
+  .prompt-card {
+    border: 4px solid #222; border-radius: 14px; background: #fff;
+    padding: 22px 26px; margin: 6px 0 10px; position: relative;
+  }
+  .pc-label {
+    position: absolute; top: -18px; left: 18px;
+    background: var(--c); color: #fff; font-weight: bold; font-size: 16px;
+    padding: 4px 16px; border-radius: 999px;
+  }
+  .pc-text { font-size: 24px; font-weight: bold; line-height: 1.7; letter-spacing: .02em; }
+  .pc-text .pc-head { color: #666; font-size: 17px; font-weight: bold; display: block; margin-bottom: 4px; }
+  .pc-hint { font-size: 15px; color: #666; margin-bottom: 20px; }
+
+  .pr h3 {
+    font-size: 21px; color: var(--c); margin: 18px 0 8px;
+    border-bottom: 2px solid var(--bg); padding-bottom: 4px;
+  }
+
+  /* 出来上がりの例 */
+  .example {
+    background: var(--bg); border-radius: 14px; padding: 18px 20px; margin-top: 16px;
+  }
+  .ex-title { font-weight: bold; color: var(--c); font-size: 19px; margin-bottom: 10px; }
+  .ex-img {
+    display: block; width: 100%; max-width: 480px; height: auto; margin: 0 auto;
+    border-radius: 10px; border: 1px solid rgba(0,0,0,.12); background: #fff;
+  }
+  .ex-note { font-size: 15px; color: #555; margin-top: 10px; }
+
+  /* 答えの例（ふきだし） */
+  .ai-bubble { display: flex; gap: 12px; align-items: flex-start; }
+  .ai-face { flex: none; font-size: 34px; line-height: 1; margin-top: 4px; }
+  .ai-said {
+    flex: 1; background: #fff; border-radius: 12px; border: 1px solid rgba(0,0,0,.12);
+    padding: 14px 18px; font-size: 17px; line-height: 1.8;
+  }
+  .ai-said b { color: var(--c); }
+
+  .osusume { background: #fff8e6; border: 2px solid #e8b93f; border-radius: 12px; padding: 14px 18px; margin-top: 16px; }
+  .osusume-title { font-weight: bold; color: #9a6c00; margin-bottom: 4px; }
+
+  /* ---------- 巻末 ---------- */
+  .endnote p, .endnote li { font-size: 17px; }
+  .endnote h3 { font-size: 21px; color: #4527a0; margin: 20px 0 8px; }
+  .endnote ul { margin-left: 1.5em; }
+  .fine { color: #888; font-size: 14px; margin-top: 26px; line-height: 1.7; }
+
+  /* ---------- スマホ ---------- */
+  @media (max-width: 720px) {
+    .page { padding: 24px 18px; margin: 12px 8px; }
+    .apps { flex-direction: column; }
+    .cover h1 { font-size: 32px; }
+    .cover .vol { font-size: 22px; }
+    .pr-name { font-size: 26px; }
+    .pc-text { font-size: 21px; }
+  }
+
+  /* ---------- 印刷 ---------- */
+  @media print {
+    body { background: #fff; font-size: 13px; line-height: 1.6; }
+    .page {
+      box-shadow: none; border-radius: 0; margin: 0 auto;
+      max-width: none; page-break-after: always; padding: 10mm 14mm;
+    }
+    .pr-name { font-size: 26px; }
+    .pc-text { font-size: 19px; }
+    .ex-img { max-width: 90mm; }
+    .qr { width: 40mm; height: 40mm; }
+    .toc-row { padding: 3px 16px; }
+    a { color: inherit; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ 表紙 ============ -->
+  <section class="page cover">
+    <div class="series">AI便利帳シリーズ</div>
+    <h1>スマホの便利帳</h1>
+    <div class="vol">AIプロンプト集</div>
+    <div class="emoji">📷✨🎨🤖</div>
+    <p class="lead">本のページを<b>写真に撮って送るだけ</b>。<br>AIが絵を描いたり、相談にのってくれたりします。<br>写して使える「AIへのお願い」12選</p>
+    <div class="pub">2026年7月 発行</div>
+  </section>
+
+  <!-- ============ この本の使い方 ============ -->
+  <section class="page howto">
+    <h2 class="sec">この本の使い方</h2>
+    <p style="margin-bottom:20px">それぞれのページに、太い黒枠で囲んだ<b>「AIへのお願い」（プロンプト）</b>が載っています。むずかしい文字入力は不要。<b>枠をスマホで写真に撮って、AIに送るだけ</b>です。</p>
+
+    <h3 style="font-size:22px;color:#4527a0;margin-bottom:10px">はじめに一度だけ：AIアプリを用意しましょう</h3>
+    <p style="font-size:17px;margin-bottom:12px">どちらか1つで大丈夫です。どちらも<b>無料</b>で使えます（Androidには「Gemini」が最初から入っていることもあります）。</p>
+    <div class="apps">
+      <div class="app-card">
+        <div class="app-name">Google Gemini<span style="font-weight:normal;font-size:15px">（ジェミニ）</span></div>
+        <svg class="qr" viewBox="0 0 29 29" role="img" aria-label="QRコード" shape-rendering="crispEdges"><rect width="29" height="29" fill="#fff"/><path d="M2 2h7v1h-7zM10 2h1v1h-1zM12 2h1v1h-1zM16 2h1v1h-1zM20 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM26 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM10 4h3v1h-3zM14 4h3v1h-3zM20 4h1v1h-1zM22 4h3v1h-3zM26 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM17 5h2v1h-2zM20 5h1v1h-1zM22 5h3v1h-3zM26 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h2v1h-2zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h3v1h-3zM26 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM11 7h1v1h-1zM13 7h1v1h-1zM15 7h2v1h-2zM20 7h1v1h-1zM26 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h7v1h-7zM11 9h5v1h-5zM17 9h2v1h-2zM2 10h1v1h-1zM5 10h10v1h-10zM16 10h4v1h-4zM22 10h1v1h-1zM24 10h3v1h-3zM2 11h1v1h-1zM4 11h2v1h-2zM10 11h2v1h-2zM15 11h3v1h-3zM21 11h5v1h-5zM3 12h1v1h-1zM5 12h1v1h-1zM7 12h3v1h-3zM12 12h1v1h-1zM14 12h1v1h-1zM17 12h1v1h-1zM20 12h2v1h-2zM23 12h1v1h-1zM26 12h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM10 13h2v1h-2zM13 13h2v1h-2zM17 13h1v1h-1zM20 13h2v1h-2zM23 13h4v1h-4zM2 14h1v1h-1zM4 14h3v1h-3zM8 14h1v1h-1zM11 14h1v1h-1zM14 14h1v1h-1zM18 14h1v1h-1zM20 14h2v1h-2zM26 14h1v1h-1zM2 15h1v1h-1zM4 15h2v1h-2zM7 15h1v1h-1zM12 15h1v1h-1zM14 15h4v1h-4zM22 15h1v1h-1zM25 15h1v1h-1zM2 16h3v1h-3zM6 16h3v1h-3zM14 16h4v1h-4zM19 16h1v1h-1zM22 16h5v1h-5zM2 17h1v1h-1zM4 17h1v1h-1zM6 17h1v1h-1zM9 17h4v1h-4zM14 17h1v1h-1zM18 17h4v1h-4zM23 17h2v1h-2zM26 17h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM8 18h2v1h-2zM11 18h1v1h-1zM13 18h4v1h-4zM18 18h5v1h-5zM24 18h2v1h-2zM10 19h2v1h-2zM13 19h3v1h-3zM18 19h1v1h-1zM22 19h1v1h-1zM24 19h2v1h-2zM2 20h7v1h-7zM10 20h1v1h-1zM12 20h2v1h-2zM18 20h1v1h-1zM20 20h1v1h-1zM22 20h1v1h-1zM26 20h1v1h-1zM2 21h1v1h-1zM8 21h1v1h-1zM10 21h2v1h-2zM15 21h4v1h-4zM22 21h1v1h-1zM25 21h2v1h-2zM2 22h1v1h-1zM4 22h3v1h-3zM8 22h1v1h-1zM10 22h1v1h-1zM13 22h2v1h-2zM16 22h7v1h-7zM2 23h1v1h-1zM4 23h3v1h-3zM8 23h1v1h-1zM10 23h2v1h-2zM13 23h1v1h-1zM16 23h1v1h-1zM19 23h2v1h-2zM25 23h2v1h-2zM2 24h1v1h-1zM4 24h3v1h-3zM8 24h1v1h-1zM12 24h2v1h-2zM15 24h2v1h-2zM18 24h2v1h-2zM22 24h5v1h-5zM2 25h1v1h-1zM8 25h1v1h-1zM11 25h1v1h-1zM16 25h1v1h-1zM19 25h1v1h-1zM21 25h2v1h-2zM24 25h3v1h-3zM2 26h7v1h-7zM10 26h2v1h-2zM14 26h1v1h-1zM18 26h1v1h-1zM20 26h1v1h-1zM23 26h1v1h-1zM26 26h1v1h-1z" fill="#111"/></svg>
+        <div class="qr-url">gemini.google.com</div>
+        <p class="app-note">Googleが作ったAI。Androidのスマホなら、最初から入っていることが多いです。</p>
+      </div>
+      <div class="app-card">
+        <div class="app-name">ChatGPT<span style="font-weight:normal;font-size:15px">（チャットジーピーティー）</span></div>
+        <svg class="qr" viewBox="0 0 29 29" role="img" aria-label="QRコード" shape-rendering="crispEdges"><rect width="29" height="29" fill="#fff"/><path d="M2 2h7v1h-7zM11 2h2v1h-2zM16 2h1v1h-1zM20 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM10 3h4v1h-4zM18 3h1v1h-1zM20 3h1v1h-1zM26 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM11 4h1v1h-1zM13 4h4v1h-4zM18 4h1v1h-1zM20 4h1v1h-1zM22 4h3v1h-3zM26 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM10 5h3v1h-3zM15 5h1v1h-1zM18 5h1v1h-1zM20 5h1v1h-1zM22 5h3v1h-3zM26 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM10 6h1v1h-1zM13 6h1v1h-1zM15 6h2v1h-2zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h3v1h-3zM26 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM11 7h1v1h-1zM13 7h2v1h-2zM16 7h1v1h-1zM18 7h1v1h-1zM20 7h1v1h-1zM26 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h7v1h-7zM10 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM17 9h2v1h-2zM3 10h1v1h-1zM5 10h4v1h-4zM10 10h6v1h-6zM18 10h3v1h-3zM22 10h2v1h-2zM25 10h1v1h-1zM3 11h3v1h-3zM10 11h1v1h-1zM13 11h2v1h-2zM16 11h3v1h-3zM21 11h5v1h-5zM3 12h1v1h-1zM5 12h1v1h-1zM7 12h3v1h-3zM11 12h1v1h-1zM13 12h1v1h-1zM16 12h2v1h-2zM19 12h1v1h-1zM21 12h1v1h-1zM23 12h1v1h-1zM26 12h1v1h-1zM4 13h1v1h-1zM6 13h2v1h-2zM10 13h1v1h-1zM12 13h1v1h-1zM14 13h1v1h-1zM19 13h2v1h-2zM23 13h4v1h-4zM3 14h1v1h-1zM5 14h5v1h-5zM13 14h5v1h-5zM20 14h2v1h-2zM26 14h1v1h-1zM2 15h1v1h-1zM5 15h3v1h-3zM10 15h3v1h-3zM15 15h4v1h-4zM22 15h1v1h-1zM25 15h1v1h-1zM2 16h8v1h-8zM13 16h2v1h-2zM16 16h3v1h-3zM20 16h1v1h-1zM22 16h5v1h-5zM2 17h1v1h-1zM4 17h1v1h-1zM6 17h2v1h-2zM12 17h2v1h-2zM18 17h4v1h-4zM23 17h2v1h-2zM26 17h1v1h-1zM2 18h1v1h-1zM4 18h1v1h-1zM6 18h5v1h-5zM12 18h1v1h-1zM14 18h1v1h-1zM17 18h6v1h-6zM24 18h2v1h-2zM10 19h1v1h-1zM13 19h1v1h-1zM17 19h2v1h-2zM22 19h1v1h-1zM24 19h2v1h-2zM2 20h7v1h-7zM14 20h1v1h-1zM16 20h1v1h-1zM18 20h1v1h-1zM20 20h1v1h-1zM22 20h1v1h-1zM26 20h1v1h-1zM2 21h1v1h-1zM8 21h1v1h-1zM10 21h1v1h-1zM12 21h1v1h-1zM14 21h1v1h-1zM16 21h3v1h-3zM22 21h1v1h-1zM25 21h1v1h-1zM2 22h1v1h-1zM4 22h3v1h-3zM8 22h1v1h-1zM10 22h1v1h-1zM13 22h10v1h-10zM26 22h1v1h-1zM2 23h1v1h-1zM4 23h3v1h-3zM8 23h1v1h-1zM10 23h3v1h-3zM14 23h2v1h-2zM17 23h1v1h-1zM19 23h2v1h-2zM25 23h2v1h-2zM2 24h1v1h-1zM4 24h3v1h-3zM8 24h1v1h-1zM11 24h2v1h-2zM16 24h1v1h-1zM22 24h5v1h-5zM2 25h1v1h-1zM8 25h1v1h-1zM10 25h4v1h-4zM20 25h3v1h-3zM24 25h3v1h-3zM2 26h7v1h-7zM13 26h1v1h-1zM15 26h1v1h-1zM18 26h3v1h-3zM23 26h1v1h-1zM26 26h1v1h-1z" fill="#111"/></svg>
+        <div class="qr-url">chatgpt.com</div>
+        <p class="app-note">世界でいちばん有名なAI。アプリを入れなくても、この住所をひらけば使えます。</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:22px;color:#4527a0;margin-bottom:10px">つかいかたは、たったの4ステップ</h3>
+    <ol>
+      <li><span class="bignum">1</span><span>AIアプリ（GeminiまたはChatGPT）を開きます。</span></li>
+      <li><span class="bignum">2</span><span>文字を打つ欄のよこにある<b>「カメラ」または「＋」のマーク</b>をタッチします。</span></li>
+      <li><span class="bignum">3</span><span>本の<b>太い黒枠が全部入るように</b>写真を撮ります。</span></li>
+      <li><span class="bignum">4</span><span>そのまま<b>送信（紙飛行機のマーク）</b>。AIが枠の中のお願いを読み取って、絵や答えを返してくれます。</span></li>
+    </ol>
+    <p style="font-size:16px;color:#555;margin-top:6px">※もしAIが「〜と書かれた写真ですね」と説明だけしてきたら、<b>「この通りにお願いします」</b>とひとこと送ってください。文字を打つのが苦手な方は、<b>マイクのマークで話しかけてもOK</b>です。</p>
+
+    <div class="promise">
+      <h3>あんしんして使うための3つの約束</h3>
+      <ul>
+        <li><b>答えは毎回変わります</b> — 同じお願いでも、AIは毎回ちがう絵・ちがう答えを返します。本に載っている例と違っても失敗ではありません。それも楽しみのひとつです。</li>
+        <li><b>大事なことは、うのみにしない</b> — AIはときどき間違えます。健康・お金・薬・法律の話は、かならず家族やお医者さん、窓口にも確認しましょう。</li>
+        <li><b>個人情報は写さない</b> — 住所・電話番号・保険証・通帳などが写真に入らないように気をつけましょう。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 目次 ============ -->
+  <section class="page">
+    <h2 class="sec">もくじ　— 写して使えるお願い 12選 —</h2>
+<div class="toc-cat" style="--c:#7b1fa2;--bg:#f3e5f5">🎨 第1章　絵や画像を作ってもらう</div>
+<a class="toc-row" href="#p01"><span class="toc-no">01</span><span>着物を着た猫の水彩画</span></a>
+<a class="toc-row" href="#p02"><span class="toc-no">02</span><span>お誕生日のお祝いカード</span></a>
+<a class="toc-row" href="#p03"><span class="toc-no">03</span><span>思い出の風景を油絵に</span></a>
+<a class="toc-row" href="#p04"><span class="toc-no">04</span><span>季節のごあいさつ画像（暑中見舞い）</span></a>
+<div class="toc-cat" style="--c:#1565c0;--bg:#e3f2fd">✉️ 第2章　文章・くらしの相談</div>
+<a class="toc-row" href="#p05"><span class="toc-no">05</span><span>今晩のこんだてを考えてもらう</span></a>
+<a class="toc-row" href="#p06"><span class="toc-no">06</span><span>お礼の手紙の下書き</span></a>
+<a class="toc-row" href="#p07"><span class="toc-no">07</span><span>むずかしい言葉をやさしく解説</span></a>
+<a class="toc-row" href="#p08"><span class="toc-no">08</span><span>俳句の先生になってもらう</span></a>
+<div class="toc-cat" style="--c:#2e7d32;--bg:#e8f5e9">📷 第3章　「もの」と一緒に写して聞く</div>
+<a class="toc-row" href="#p09"><span class="toc-no">09</span><span>花の名前と育て方をしらべる</span></a>
+<a class="toc-row" href="#p10"><span class="toc-no">10</span><span>ある材料で作れる料理を聞く</span></a>
+<a class="toc-row" href="#p11"><span class="toc-no">11</span><span>書類の内容をやさしくまとめてもらう</span></a>
+<a class="toc-row" href="#p12"><span class="toc-no">12</span><span>外国語をほんやくしてもらう</span></a>
+  </section>
+
+  <!-- ============ 第1章 ============ -->
+
+  <section class="page pr" id="p01" style="--c:#7b1fa2;--bg:#f3e5f5">
+    <header class="pr-head">
+      <div class="pr-cat">🎨 第1章　絵や画像を作ってもらう</div>
+      <div class="pr-no">01<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">着物を着た猫の水彩画</h2>
+    <p class="pr-what">AIは「こんな絵を描いて」とお願いすると、その場で絵を描いてくれます。まずはかわいい一枚から。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>桜の木の下で、着物を着た猫がお茶を飲んでいる様子を、やさしい水彩画で描いてください。サインや文字は入れないでください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">🖼️ 出来上がりのイメージ</div>
+      <svg class="ex-img" viewBox="0 0 800 600" role="img" aria-label="出来上がりのイメージ：桜の下で着物を着た猫がお茶を飲む水彩画">
+        <rect width="800" height="600" fill="#fdf8f2"/>
+        <ellipse cx="400" cy="560" rx="420" ry="70" fill="#e8f0dc"/>
+        <path d="M640 600 C635 480 650 380 700 300 L740 320 C690 400 680 490 685 600 Z" fill="#8d6e63"/>
+        <path d="M700 340 C660 300 630 260 625 220 L655 210 C665 255 690 290 720 320 Z" fill="#8d6e63"/>
+        <g fill="#f8bbd0">
+          <circle cx="620" cy="180" r="70"/><circle cx="700" cy="140" r="80"/><circle cx="760" cy="220" r="65"/>
+          <circle cx="560" cy="240" r="55"/><circle cx="680" cy="250" r="60"/>
+        </g>
+        <g fill="#f48fb1" opacity=".55">
+          <circle cx="650" cy="170" r="30"/><circle cx="730" cy="190" r="26"/><circle cx="590" cy="220" r="22"/>
+        </g>
+        <g fill="#f8bbd0">
+          <ellipse cx="150" cy="120" rx="10" ry="6" transform="rotate(-25 150 120)"/>
+          <ellipse cx="260" cy="200" rx="9" ry="5" transform="rotate(20 260 200)"/>
+          <ellipse cx="90" cy="300" rx="9" ry="5" transform="rotate(-15 90 300)"/>
+          <ellipse cx="330" cy="90" rx="10" ry="6" transform="rotate(35 330 90)"/>
+          <ellipse cx="480" cy="150" rx="9" ry="5" transform="rotate(-30 480 150)"/>
+        </g>
+        <ellipse cx="330" cy="520" rx="180" ry="40" fill="#d32f2f" opacity=".25"/>
+        <path d="M250 470 C240 380 270 330 330 330 C390 330 420 380 410 470 C400 520 260 520 250 470 Z" fill="#7986cb"/>
+        <path d="M258 420 L402 420 L398 452 L262 452 Z" fill="#fff59d"/>
+        <path d="M300 350 C320 380 340 380 360 350 L360 470 L300 470 Z" fill="#fffdf5"/>
+        <circle cx="330" cy="280" r="62" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+        <path d="M280 240 L268 190 L310 218 Z" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+        <path d="M380 240 L392 190 L350 218 Z" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+        <path d="M283 236 L276 206 L302 224 Z" fill="#f8bbd0"/>
+        <path d="M377 236 L384 206 L358 224 Z" fill="#f8bbd0"/>
+        <path d="M296 275 q8 8 16 0" stroke="#5d4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M348 275 q8 8 16 0" stroke="#5d4037" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M322 296 q8 8 16 0" stroke="#5d4037" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <circle cx="330" cy="290" r="4" fill="#5d4037"/>
+        <ellipse cx="292" cy="298" rx="10" ry="6" fill="#f8bbd0" opacity=".7"/>
+        <ellipse cx="368" cy="298" rx="10" ry="6" fill="#f8bbd0" opacity=".7"/>
+        <ellipse cx="330" cy="452" rx="34" ry="16" fill="#bcaaa4"/>
+        <path d="M304 430 C304 414 356 414 356 430 L356 448 C356 460 304 460 304 448 Z" fill="#a1887f"/>
+        <path d="M304 430 C304 442 356 442 356 430" fill="none" stroke="#8d6e63" stroke-width="3"/>
+        <path d="M322 404 q4 -14 -4 -22 M338 404 q-4 -14 4 -22" stroke="#b0bec5" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <ellipse cx="290" cy="440" rx="16" ry="12" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+        <ellipse cx="370" cy="440" rx="16" ry="12" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+        <path d="M410 460 C450 440 470 400 465 360 C480 400 470 450 430 478 Z" fill="#fffdf5" stroke="#e0d5c5" stroke-width="2"/>
+      </svg>
+      <p class="ex-note">※出来上がりのイメージ（挿絵）です。実際にはAIが本物の水彩画ふうの絵を描いて返してくれます。答えは毎回変わります。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「猫」を「柴犬」や「パンダ」に、「桜」を「紅葉」や「雪景色」に言いかえるだけで、まったく別の絵になります。出来上がった絵は、待ち受け画面にもできます。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p02" style="--c:#7b1fa2;--bg:#f3e5f5">
+    <header class="pr-head">
+      <div class="pr-cat">🎨 第1章　絵や画像を作ってもらう</div>
+      <div class="pr-no">02<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">お誕生日のお祝いカード</h2>
+    <p class="pr-what">文字入りのカード画像も作れます。できた画像をそのまま家族やお友だちに送れば、世界に一枚だけのカードに。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>「おたんじょうびおめでとう」と書いた、花束とケーキのかわいいお祝いカードの画像を作ってください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">🖼️ 出来上がりのイメージ</div>
+      <svg class="ex-img" viewBox="0 0 800 600" role="img" aria-label="出来上がりのイメージ：おたんじょうびおめでとうと書かれた花束とケーキのカード">
+        <rect width="800" height="600" fill="#fff8ef"/>
+        <rect x="22" y="22" width="756" height="556" rx="18" fill="none" stroke="#ffab91" stroke-width="5" stroke-dasharray="2 14" stroke-linecap="round"/>
+        <g>
+          <circle cx="110" cy="90" r="8" fill="#ffd54f"/><circle cx="690" cy="110" r="8" fill="#81d4fa"/>
+          <circle cx="160" cy="500" r="7" fill="#aed581"/><circle cx="650" cy="480" r="8" fill="#f48fb1"/>
+          <rect x="240" y="70" width="14" height="14" rx="3" fill="#f48fb1" transform="rotate(25 247 77)"/>
+          <rect x="560" y="60" width="14" height="14" rx="3" fill="#aed581" transform="rotate(-20 567 67)"/>
+          <rect x="90" y="330" width="12" height="12" rx="3" fill="#81d4fa" transform="rotate(15 96 336)"/>
+          <rect x="700" y="300" width="12" height="12" rx="3" fill="#ffd54f" transform="rotate(-25 706 306)"/>
+        </g>
+        <text x="400" y="150" text-anchor="middle" font-size="58" font-weight="bold" fill="#e57373" font-family="'Hiragino Maru Gothic ProN','BIZ UDGothic',sans-serif">おたんじょうび</text>
+        <text x="400" y="225" text-anchor="middle" font-size="58" font-weight="bold" fill="#e57373" font-family="'Hiragino Maru Gothic ProN','BIZ UDGothic',sans-serif">おめでとう</text>
+        <g>
+          <path d="M195 540 L145 400 L295 400 L245 540 Z" fill="#ffe0b2" stroke="#ffb74d" stroke-width="3"/>
+          <path d="M170 420 C150 370 165 330 185 310 M220 415 C215 355 220 325 220 300 M270 420 C285 370 275 330 258 308" stroke="#66bb6a" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <g fill="#ef5350"><path d="M185 312 c-16 -2 -22 -22 -12 -34 c6 8 10 8 12 2 c2 6 6 6 12 -2 c10 12 4 32 -12 34 z"/></g>
+          <g fill="#ffca28"><path d="M220 300 c-16 -2 -22 -22 -12 -34 c6 8 10 8 12 2 c2 6 6 6 12 -2 c10 12 4 32 -12 34 z"/></g>
+          <g fill="#ec407a"><path d="M258 310 c-16 -2 -22 -22 -12 -34 c6 8 10 8 12 2 c2 6 6 6 12 -2 c10 12 4 32 -12 34 z"/></g>
+          <ellipse cx="197" cy="345" rx="12" ry="7" fill="#81c784" transform="rotate(-30 197 345)"/>
+          <ellipse cx="245" cy="350" rx="12" ry="7" fill="#81c784" transform="rotate(30 245 350)"/>
+          <path d="M175 455 L265 455" stroke="#f06292" stroke-width="10" stroke-linecap="round"/>
+          <circle cx="220" cy="455" r="14" fill="#f8bbd0" stroke="#f06292" stroke-width="4"/>
+        </g>
+        <g>
+          <rect x="440" y="470" width="240" height="70" rx="10" fill="#fff" stroke="#ffcdd2" stroke-width="3"/>
+          <rect x="465" y="400" width="190" height="72" rx="10" fill="#ffe4ec"/>
+          <path d="M465 400 h190 v18 q-24 22 -47 0 q-24 22 -48 0 q-24 22 -48 0 q-24 22 -47 0 z" fill="#fff"/>
+          <circle cx="500" cy="392" r="12" fill="#e53935"/><circle cx="560" cy="388" r="12" fill="#e53935"/><circle cx="620" cy="392" r="12" fill="#e53935"/>
+          <rect x="516" y="330" width="10" height="52" rx="4" fill="#4fc3f7"/>
+          <rect x="556" y="322" width="10" height="60" rx="4" fill="#ffb74d"/>
+          <rect x="596" y="330" width="10" height="52" rx="4" fill="#aed581"/>
+          <ellipse cx="521" cy="318" rx="7" ry="12" fill="#ffca28"/><ellipse cx="561" cy="310" rx="7" ry="12" fill="#ffca28"/><ellipse cx="601" cy="318" rx="7" ry="12" fill="#ffca28"/>
+        </g>
+      </svg>
+      <p class="ex-note">※出来上がりのイメージ（挿絵）です。実際にはAIがカード画像を作って返してくれます。文字がうまく入らないときは「文字をきれいに直して」と送りましょう。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>文字を「ありがとう」「がんばってね」「けっこんおめでとう」に変えれば、どんなお祝いにも使えます。「ひまわりの花束にして」など細かい注文もできます。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p03" style="--c:#7b1fa2;--bg:#f3e5f5">
+    <header class="pr-head">
+      <div class="pr-cat">🎨 第1章　絵や画像を作ってもらう</div>
+      <div class="pr-no">03<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">思い出の風景を油絵に</h2>
+    <p class="pr-what">言葉で伝えた風景を、絵画のように仕上げてくれます。旅の思い出や、ふるさとの景色をどうぞ。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>夕焼けの海辺を、年配の夫婦がゆっくり散歩している後ろ姿を、あたたかい雰囲気の油絵で描いてください。サインや文字は入れないでください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">🖼️ 出来上がりのイメージ</div>
+      <svg class="ex-img" viewBox="0 0 800 600" role="img" aria-label="出来上がりのイメージ：夕焼けの海辺を散歩する夫婦の後ろ姿の油絵">
+        <defs>
+          <linearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f9a825"/><stop offset=".45" stop-color="#ff8a65"/><stop offset="1" stop-color="#f48fb1"/>
+          </linearGradient>
+          <linearGradient id="sea3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ef6c00"/><stop offset="1" stop-color="#ad5389"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="360" fill="url(#sky3)"/>
+        <circle cx="400" cy="330" r="70" fill="#fff3b0"/>
+        <circle cx="400" cy="330" r="95" fill="#fff3b0" opacity=".35"/>
+        <path d="M60 120 q90 -18 180 0 q-90 16 -180 0z" fill="#ffcc80" opacity=".8"/>
+        <path d="M540 90 q110 -20 220 0 q-110 18 -220 0z" fill="#ffcc80" opacity=".7"/>
+        <path d="M600 190 q80 -14 160 0 q-80 14 -160 0z" fill="#ffab91" opacity=".8"/>
+        <rect y="355" width="800" height="130" fill="url(#sea3)"/>
+        <g stroke="#ffe0b2" stroke-width="6" stroke-linecap="round" opacity=".8">
+          <path d="M360 380 h80"/><path d="M345 405 h110"/><path d="M330 432 h140"/><path d="M355 458 h90"/>
+        </g>
+        <g stroke="#f8bbd0" stroke-width="5" stroke-linecap="round" opacity=".6">
+          <path d="M90 395 h70"/><path d="M620 415 h90"/><path d="M140 445 h60"/><path d="M660 450 h70"/>
+        </g>
+        <path d="M0 485 Q400 460 800 490 L800 600 L0 600 Z" fill="#8d6e63"/>
+        <path d="M0 500 Q400 476 800 505" stroke="#ffcc80" stroke-width="5" fill="none" opacity=".7"/>
+        <g fill="#4e342e">
+          <circle cx="368" cy="430" r="17"/>
+          <path d="M352 445 C348 490 352 520 356 545 L366 545 L370 500 L376 545 L386 545 C390 510 388 470 384 445 Q368 436 352 445 Z"/>
+          <circle cx="432" cy="440" r="15"/>
+          <path d="M418 453 C414 492 416 520 420 542 L430 542 L433 505 L438 542 L448 542 C451 512 450 478 446 453 Q432 444 418 453 Z"/>
+          <path d="M384 462 Q400 475 418 465 L416 474 Q400 483 386 471 Z"/>
+          <path d="M448 460 L462 542 L456 544 L444 468 Z"/>
+        </g>
+        <ellipse cx="375" cy="552" rx="40" ry="7" fill="#3e2723" opacity=".35"/>
+        <ellipse cx="437" cy="549" rx="34" ry="6" fill="#3e2723" opacity=".35"/>
+      </svg>
+      <p class="ex-note">※出来上がりのイメージ（挿絵）です。実際にはAIが油絵ふうの一枚を描いて返してくれます。答えは毎回変わります。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「函館の夜景」「田んぼのあぜ道と赤とんぼ」など、思い出の場所に言いかえてみましょう。「水墨画で」「切り絵風で」と画風を変えるのも楽しいです。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p04" style="--c:#7b1fa2;--bg:#f3e5f5">
+    <header class="pr-head">
+      <div class="pr-cat">🎨 第1章　絵や画像を作ってもらう</div>
+      <div class="pr-no">04<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">季節のごあいさつ画像（暑中見舞い）</h2>
+    <p class="pr-what">季節のあいさつ画像を作って、そのまま家族や友人に送れます。はがき代わりに大活躍。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>「暑中お見舞い申し上げます」と書いた、朝顔と風鈴の涼しげな画像を作ってください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">🖼️ 出来上がりのイメージ</div>
+      <svg class="ex-img" viewBox="0 0 800 600" role="img" aria-label="出来上がりのイメージ：暑中お見舞い申し上げますと書かれた朝顔と風鈴の画像">
+        <rect width="800" height="600" fill="#fcfeff"/>
+        <path d="M0 600 Q200 560 400 585 Q600 610 800 575 L800 600 Z" fill="#e1f5fe"/>
+        <rect x="380" y="30" width="420" height="26" rx="6" fill="#6d4c41"/>
+        <path d="M560 56 L560 130" stroke="#90a4ae" stroke-width="3"/>
+        <path d="M520 130 C520 100 600 100 600 130 C600 165 585 185 560 185 C535 185 520 165 520 130 Z" fill="#b3e5fc" stroke="#81d4fa" stroke-width="3" opacity=".9"/>
+        <path d="M532 118 C532 106 548 102 554 106" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <path d="M560 150 L560 200" stroke="#90a4ae" stroke-width="2.5"/>
+        <circle cx="560" cy="196" r="6" fill="#0277bd"/>
+        <path d="M552 204 L576 204 L580 300 L548 300 Z" fill="#fff" stroke="#b3e5fc" stroke-width="2.5"/>
+        <path d="M556 226 Q566 236 574 226 M556 262 Q566 272 574 262" stroke="#f48fb1" stroke-width="3" fill="none"/>
+        <g>
+          <path d="M60 600 C120 520 100 420 160 360 C220 300 200 220 260 180" stroke="#66bb6a" stroke-width="6" fill="none"/>
+          <path d="M160 360 C200 340 240 350 260 380 M120 470 C160 450 200 460 220 490" stroke="#66bb6a" stroke-width="5" fill="none"/>
+          <g fill="#43a047"><path d="M250 150 q30 -22 52 4 q-6 30 -34 30 q-24 -6 -18 -34z"/><path d="M270 385 q30 -22 52 4 q-6 30 -34 30 q-24 -6 -18 -34z"/><path d="M225 495 q28 -20 48 4 q-6 28 -32 28 q-22 -6 -16 -32z"/></g>
+          <g>
+            <circle cx="200" cy="260" r="52" fill="#3f51b5"/>
+            <circle cx="200" cy="260" r="20" fill="#fff"/>
+            <path d="M200 210 L200 240 M155 245 L182 255 M245 245 L218 255 M170 305 L190 280 M230 305 L210 280" stroke="#c5cae9" stroke-width="6" stroke-linecap="round"/>
+            <circle cx="130" cy="430" r="46" fill="#5c6bc0"/>
+            <circle cx="130" cy="430" r="17" fill="#fff"/>
+            <path d="M130 388 L130 413 M92 418 L115 427 M168 418 L145 427 M105 468 L120 447 M155 468 L140 447" stroke="#c5cae9" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="285" cy="520" r="38" fill="#7986cb"/>
+            <circle cx="285" cy="520" r="14" fill="#fff"/>
+          </g>
+        </g>
+        <g fill="#283593" font-weight="bold" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="48" text-anchor="middle">
+          <text x="700" y="110">暑</text><text x="700" y="164">中</text><text x="700" y="218">お</text>
+          <text x="700" y="272">見</text><text x="700" y="326">舞</text><text x="700" y="380">い</text>
+        </g>
+        <g fill="#283593" font-family="'Hiragino Mincho ProN','Yu Mincho',serif" font-size="36" text-anchor="middle">
+          <text x="630" y="200">申</text><text x="630" y="244">し</text><text x="630" y="288">上</text>
+          <text x="630" y="332">げ</text><text x="630" y="376">ま</text><text x="630" y="420">す</text>
+        </g>
+      </svg>
+      <p class="ex-note">※出来上がりのイメージ（挿絵）です。実際にはAIが涼しげなあいさつ画像を作って返してくれます。答えは毎回変わります。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>お正月は「あけましておめでとうございます」と来年の干支に。「喪中を避けたおだやかな冬のあいさつ画像」のような細かいお願いもできます。</p>
+    </div>
+  </section>
+
+  <!-- ============ 第2章 ============ -->
+
+  <section class="page pr" id="p05" style="--c:#1565c0;--bg:#e3f2fd">
+    <header class="pr-head">
+      <div class="pr-cat">✉️ 第2章　文章・くらしの相談</div>
+      <div class="pr-no">05<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">今晩のこんだてを考えてもらう</h2>
+    <p class="pr-what">冷蔵庫の中身を伝えると、作れる料理を考えてくれます。毎日の「今日なに作ろう…」から解放されます。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>冷蔵庫に豚肉・キャベツ・卵があります。今晩の夕食の献立を3つ考えてください。作り方がかんたんなものでお願いします。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">かしこまりました。3つご提案しますね。<br><b>① 豚肉とキャベツの回鍋肉（ホイコーロー）風炒め</b> — 味噌と砂糖で炒めるだけ。<br><b>② ふんわり卵のお好み焼き風</b> — キャベツと卵を混ぜて焼くだけ。<br><b>③ 豚たま丼</b> — 豚肉を甘辛く炒めて卵でとじ、ご飯にのせます。<br>くわしい作り方を知りたい料理はありますか？</div></div>
+      <p class="ex-note">※答えの一例です。「①の作り方を教えて」と続けて聞けば、手順をくわしく教えてくれます。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>材料の部分を、その日冷蔵庫にあるものに読みかえて口で伝えてもOK。「塩分ひかえめで」「歯が弱くてもやわらかく食べられるもの」という注文もできます。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p06" style="--c:#1565c0;--bg:#e3f2fd">
+    <header class="pr-head">
+      <div class="pr-cat">✉️ 第2章　文章・くらしの相談</div>
+      <div class="pr-no">06<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">お礼の手紙の下書き</h2>
+    <p class="pr-what">あらたまった手紙の文面を考えてくれます。下書きをもとに、自分の言葉を少し足すだけで立派な手紙に。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>入院中にお見舞いに来てくれた友人へ送る、お礼の手紙の下書きを、ていねいな言葉で書いてください。長さは便せん1枚くらいでお願いします。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">拝啓　朝夕はいくらか過ごしやすくなってまいりました。<br>先日はお忙しい中、わざわざお見舞いにお越しくださり、本当にありがとうございました。あなたの顔を見たとたん、心がふっと軽くなり、その後の回復も早まったように感じています。おかげさまで、少しずつ日常を取り戻しております——<br><span style="color:#888">（このあと結びまで続きます）</span></div></div>
+      <p class="ex-note">※答えの一例です。「もう少しくだけた感じに」「季節のあいさつを秋らしく」と直してもらえます。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「香典返しに添えるあいさつ状」「町内会をやめるときのあいさつ文」「孫の入学祝いに添える一言」など、書きにくい文面ほどAIが頼りになります。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p07" style="--c:#1565c0;--bg:#e3f2fd">
+    <header class="pr-head">
+      <div class="pr-cat">✉️ 第2章　文章・くらしの相談</div>
+      <div class="pr-no">07<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">むずかしい言葉をやさしく解説</h2>
+    <p class="pr-what">テレビや新聞で見かける横文字・新語を、たとえ話でわかりやすく説明してくれます。何度聞いても嫌な顔をしません。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>「サブスク」とは何ですか。スマホにくわしくない人にもわかるように、身近なたとえ話で説明してください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said"><b>「サブスク」は、新聞の定期購読とよく似た仕組み</b>です。新聞は毎月決まったお金を払うと毎日届きますね。同じように、毎月決まった料金を払うと、音楽や映画が「見放題・聴き放題」になるサービスのことです。やめたいときは、新聞と同じで「解約」の手続きをすれば、翌月から料金はかかりません。</div></div>
+      <p class="ex-note">※答えの一例です。わからなければ「もっとやさしく」と何度でも聞き直せます。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「サブスク」の部分を「キャッシュレス」「マイナポータル」「インボイス」など、気になる言葉に言いかえて使ってください。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p08" style="--c:#1565c0;--bg:#e3f2fd">
+    <header class="pr-head">
+      <div class="pr-cat">✉️ 第2章　文章・くらしの相談</div>
+      <div class="pr-no">08<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">俳句の先生になってもらう</h2>
+    <p class="pr-what">AIは俳句や川柳も作ります。お手本を見せてもらったり、自分の句の感想を聞いたり、句会のお相手にどうぞ。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠を写真に撮って、AIに送ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>「夏の朝の散歩」をお題に、俳句を3つ作ってください。そのあと、私も一句作るので、やさしく感想を聞かせてください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">お題「夏の朝の散歩」で3句、詠んでみました。<br><b>朝顔に　あいさつひとつ　歩き出す</b><br><b>ラジオ体操　終えて商店街の　風涼し</b><br><b>木もれ日を　踏んで軽やか　夏の靴</b><br>お気に召す句はありましたか？　次はぜひ、あなたの一句をお聞かせください。</div></div>
+      <p class="ex-note">※答えの一例です。自分の句を送ると「季語がすてきですね」と感想や添削を返してくれます。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「川柳で」「短歌で」でもOK。「デイサービスの掲示板に貼る今月の一句を一緒に考えて」のような使い方も人気です。</p>
+    </div>
+  </section>
+
+  <!-- ============ 第3章 ============ -->
+
+  <section class="page pr" id="p09" style="--c:#2e7d32;--bg:#e8f5e9">
+    <header class="pr-head">
+      <div class="pr-cat">📷 第3章　「もの」と一緒に写して聞く</div>
+      <div class="pr-no">09<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">花の名前と育て方をしらべる</h2>
+    <p class="pr-what">この章は使い方が少しだけ変わります。<b>この枠と「調べたいもの」を、1枚の写真にいっしょに写して</b>送ってください。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠と「お花」を、いっしょに写真に撮ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>この写真にいっしょに写っている花の名前と、育て方のコツを教えてください。</p>
+    </div>
+    <p class="pc-hint">※本を花のよこに置いて、枠と花が両方入るように撮るのがコツです。花だけを撮って、マイクで「この花の名前は？」と話しかけてもOK。</p>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">お写真の花は<b>アジサイ（紫陽花）</b>ですね。青色なので、酸性の土で育っているようです。<br><b>育て方のコツ：</b>① 水切れに弱いので、夏は朝夕たっぷり水やりを。② 花が終わったら7月中に剪定（せんてい）すると、来年もよく咲きます。</div></div>
+      <p class="ex-note">※答えの一例です。似た花と間違えることもあるので、大事な場面では図鑑やお花屋さんでも確認を。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>散歩中に見かけた花や、いただいた鉢植えにどうぞ。「葉が黄色くなってきた原因は？」と、育てている植物の健康相談もできます。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p10" style="--c:#2e7d32;--bg:#e8f5e9">
+    <header class="pr-head">
+      <div class="pr-cat">📷 第3章　「もの」と一緒に写して聞く</div>
+      <div class="pr-no">10<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">ある材料で作れる料理を聞く</h2>
+    <p class="pr-what">冷蔵庫から出した材料を並べて、この枠といっしょにパチリ。あるものだけで作れる料理を考えてくれます。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠と「材料」を、いっしょに写真に撮ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>この写真にいっしょに写っている食材で作れる、かんたんな料理を2つ教えてください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">お写真には<b>じゃがいも・玉ねぎ・ベーコン</b>が写っていますね。<br><b>① ジャーマンポテト</b> — 全部をバターで炒めて塩こしょうするだけ。<br><b>② じゃがいもと玉ねぎのお味噌汁</b> — ベーコンを少し入れるとコクが出ます。</div></div>
+      <p class="ex-note">※答えの一例です。「①の作り方をくわしく」と続ければ、手順を教えてくれます。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>スーパーの特売品を買う前に写して「これで何が作れる？」と聞くのも便利。「糖尿病でも安心な味付けで」などの相談もできます（最終判断はお医者さんと）。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p11" style="--c:#2e7d32;--bg:#e8f5e9">
+    <header class="pr-head">
+      <div class="pr-cat">📷 第3章　「もの」と一緒に写して聞く</div>
+      <div class="pr-no">11<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">書類の内容をやさしくまとめてもらう</h2>
+    <p class="pr-what">役所からの通知や説明書など、細かい字でびっしりの書類。要点だけをやさしい言葉にしてもらえます。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠と「書類」を、いっしょに写真に撮ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>この写真にいっしょに写っている書類の内容を、大事なところだけ3つにまとめて、やさしい言葉で教えてください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">この書類は「健康診査のお知らせ」です。大事な点は3つです。<br><b>① 9月30日までに</b>受ける必要があります。<br><b>② 予約が必要</b>です（同封の一覧の病院へ電話）。<br><b>③ 当日は保険証とこのハガキ</b>を持っていきます。費用は無料です。</div></div>
+      <p class="ex-note">※答えの一例です。<b>年金・保険・お金にかかわる書類は、AIの説明だけで判断せず</b>、家族や窓口にも確認してください。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「この中で、私がやらないといけないことは何？」と聞き方を変えるのも便利。家電の説明書を写して「音を小さくする方法だけ教えて」もよく効きます。</p>
+    </div>
+  </section>
+
+  <section class="page pr" id="p12" style="--c:#2e7d32;--bg:#e8f5e9">
+    <header class="pr-head">
+      <div class="pr-cat">📷 第3章　「もの」と一緒に写して聞く</div>
+      <div class="pr-no">12<span>/12</span></div>
+    </header>
+    <h2 class="pr-name">外国語をほんやくしてもらう</h2>
+    <p class="pr-what">輸入食品のパッケージ、海外からの手紙、外国語の説明書き。写すだけで日本語にしてくれます。</p>
+    <div class="prompt-card">
+      <div class="pc-label">📷 この枠と「外国語の文章」を、いっしょに写真に撮ってください</div>
+      <p class="pc-text"><span class="pc-head">AIへのお願い</span>この写真にいっしょに写っている外国語の文章を、日本語に訳してください。</p>
+    </div>
+    <div class="example">
+      <div class="ex-title">💬 答えの例</div>
+      <div class="ai-bubble"><div class="ai-face">🤖</div><div class="ai-said">パッケージの英語を訳しますね。<br><b>「開封後は冷蔵庫で保存し、5日以内にお召し上がりください。ナッツ類を含む工場で製造しています。」</b><br>アレルギーの注意書きがありますので、ナッツにアレルギーのある方はお気をつけください。</div></div>
+      <p class="ex-note">※答えの一例です。薬の用法など命にかかわる翻訳は、薬剤師さんにも必ず確認してください。</p>
+    </div>
+    <div class="osusume">
+      <div class="osusume-title">💡 アレンジのヒント</div>
+      <p>「ローマ字の宛名の書き方を教えて」「この日本語を英語にして」と逆方向もできます。海外のお孫さんとのやりとりにもどうぞ。</p>
+    </div>
+  </section>
+
+  <!-- ============ 巻末 ============ -->
+  <section class="page endnote">
+    <h2 class="sec">こまったときは</h2>
+    <h3>写真を送ったのに、絵や答えが返ってこないとき</h3>
+    <ul>
+      <li>AIが「〜と書かれた写真ですね」と説明だけしてきたら、<b>「この通りにお願いします」</b>とひとこと送りましょう。</li>
+      <li>枠の文字がぼやけていると読み取れません。<b>明るい場所で、枠全体が入るように</b>撮り直してみてください。</li>
+      <li>文字を打たなくても、<b>マイクのマーク</b>を押して「この写真のお願いをやって」と話しかければ伝わります。</li>
+    </ul>
+    <h3>料金はかかるの？</h3>
+    <p>GeminiもChatGPTも、<b>基本は無料</b>で使えます。無料のままだと、絵を描いてもらえる回数などに1日の上限があり、上限に達すると「また明日どうぞ」と案内されます。<b>翌日になればまた無料で使えます</b>。月額の有料プランもありますが、この本の内容は無料の範囲で楽しめます。</p>
+    <h3>AIと上手につきあうために</h3>
+    <ul>
+      <li>AIの答えは<b>毎回変わります</b>。気に入らなければ「もう一回」「もっと明るく」とやり直してもらいましょう。</li>
+      <li>AIは自信たっぷりに<b>間違えることがあります</b>。健康・お金・薬・法律のことは、かならず人にも確認を。</li>
+      <li>AIが作った絵に<b>実在の人の顔や名前</b>を使うのはやめましょう。作った画像を年賀状などに使うのは自由です。</li>
+      <li>AIの絵の隅に、<b>読めないサインのような走り書き</b>が入ることがあります。これはAIが本物の絵の「サインが入っている」という癖までまねしたもので、<b>実在の画家のサインではありません</b>。気になるときは「サインや文字は入れないでください」とお願いすると防げます。</li>
+    </ul>
+    <div class="fine">
+      <p>※ 掲載内容・URL・料金は2026年7月時点の情報です。AIサービスの内容や無料で使える範囲は変わることがあります。</p>
+      <p>※ 「出来上がりのイメージ」は本書の挿絵です。実際にはAIがその場で本物の画像を作って返してくれます。同じお願いをしても、同じ絵にはなりません。</p>
+      <p>※ Google Gemini、ChatGPTの名称は、それぞれの権利者に帰属します。本書は各サービスの案内のみを行っています。</p>
+      <p>AI便利帳シリーズ「スマホの便利帳 AIプロンプト集」</p>
+    </div>
+  </section>
+
+</body>
+</html>
